@@ -135,7 +135,10 @@ async def starvation_check(db):
     now = datetime.now(UTC)
     ops = []
     for job in jobs:
-        age_min = (now - job["created_at"]).total_seconds() / 60.0
+        created = job["created_at"]
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        age_min = (now - created).total_seconds() / 60.0
         boost = min(age_min / 10.0, 2.0)
         new = max(0.1, float(job["priority"]) - boost)
         if new < job.get("effective_priority", float(job["priority"])):
@@ -146,7 +149,10 @@ async def starvation_check(db):
     if ops:
         await db.jobs.bulk_write(ops)
         for job in jobs:
-            age_min = (now - job["created_at"]).total_seconds() / 60.0
+            created = job["created_at"]
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=UTC)
+            age_min = (now - created).total_seconds() / 60.0
             boost = min(age_min / 10.0, 2.0)
             new = max(0.1, float(job["priority"]) - boost)
             if new < job.get("effective_priority", float(job["priority"])):
@@ -350,11 +356,12 @@ async def process_job(job: dict, db, redis):
         await handle_success(job, result, db, redis)
 
     except Exception as exc:
-        extender.cancel()
-        try:
-            await extender
-        except asyncio.CancelledError:
-            pass
+        if extender is not None:
+            extender.cancel()
+            try:
+                await extender
+            except asyncio.CancelledError:
+                pass
         await handle_failure(job, exc, db, redis)
 
 
