@@ -61,12 +61,18 @@ class TimingWheel:
         self.slots[slot] = [e for e in self.slots[slot] if e.job_id != job_id]
 
     def tick(self) -> list[str]:
-        """Return all job_ids scheduled for the current second."""
+        """Return due job_ids scheduled for the current second."""
         now = datetime.now(UTC)
         slot = int(now.timestamp()) % MAX_SLOTS
-        due = self.slots[slot]
-        job_ids = [e.job_id for e in due]
-        self.slots[slot] = []
+        due = []
+        remaining = []
+        for entry in self.slots[slot]:
+            if entry.scheduled_at <= now:
+                due.append(entry.job_id)
+            else:
+                remaining.append(entry)
+        self.slots[slot] = remaining
+        job_ids = due
         for jid in job_ids:
             self._job_slots.pop(jid, None)
         return job_ids
@@ -160,26 +166,26 @@ class IndexedPriorityQueue:
         )
 
     def __init__(self):
-        self._heap: list[tuple] = []
+        self._heap: list[list] = []
         self._index: dict[str, int] = {}
-        self._entries: dict[str, dict] = {}
+        self._entries: dict[str, list] = {}
         self._count: int = 0
 
     def push(self, job: dict):
         jid = job["job_id"]
         key = self._sort_key(job)
-        entry = (key, job)
-        if jid in self._entries:
-            self._entries[jid] = _REMOVED
-        heapq.heappush(self._heap, entry)
+        entry = [key, jid, job]
+        is_new = jid not in self._entries
         self._entries[jid] = entry
-        self._count += 1
+        heapq.heappush(self._heap, entry)
+        if is_new:
+            self._count += 1
 
     def pop(self) -> dict | None:
         while self._heap:
-            _, job = heapq.heappop(self._heap)
-            jid = job["job_id"]
-            if self._entries.get(jid) is _REMOVED:
+            entry = heapq.heappop(self._heap)
+            _, jid, job = entry
+            if self._entries.get(jid) is not entry:
                 continue
             self._entries.pop(jid, None)
             self._count -= 1
@@ -190,19 +196,18 @@ class IndexedPriorityQueue:
         entry = self._entries.get(job_id)
         if entry is None or entry is _REMOVED:
             return
-        _, job = entry
+        _, _, job = entry
         job["effective_priority"] = new_effective_priority
-        self._entries[job_id] = _REMOVED
         key = self._sort_key(job)
-        heapq.heappush(self._heap, (key, job))
-        self._entries[job_id] = (key, job)
-        self._count += 1
+        new_entry = [key, job_id, job]
+        self._entries[job_id] = new_entry
+        heapq.heappush(self._heap, new_entry)
 
     def remove(self, job_id: str):
         entry = self._entries.get(job_id)
         if entry is None or entry is _REMOVED:
             return
-        self._entries[job_id] = _REMOVED
+        self._entries.pop(job_id, None)
         self._count -= 1
 
     def heapify(self, jobs: list[dict]):
@@ -212,7 +217,7 @@ class IndexedPriorityQueue:
         for job in jobs:
             jid = job["job_id"]
             key = self._sort_key(job)
-            entry = (key, job)
+            entry = [key, jid, job]
             self._heap.append(entry)
             self._entries[jid] = entry
             self._count += 1

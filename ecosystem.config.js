@@ -10,25 +10,19 @@
  *   pm2 logs
  *   pm2 stop ecosystem.config.js
  */
-
 const path = require("path");
 
-const pythonInterpreter = path.join(
-  __dirname,
-  "backend",
-  ".venv",
-  "Scripts",
-  "python.exe"
-);
+const pythonInterpreter = '/home/ubuntu/dillame-scheduler/backend/.venv/bin/python'
+const backendDir = '/home/ubuntu/dillame-scheduler/backend'
 
 module.exports = {
   apps: [
     {
       name: "dillame-api",
       script: "uvicorn",
-      args: "main:app --host 0.0.0.0 --port 8000 --reload",
+      args: "main:app --host 0.0.0.0 --port 8000",
       interpreter: pythonInterpreter,
-      cwd: __dirname,
+      cwd: backendDir,
       env: {
         PYTHONUNBUFFERED: "1",
       },
@@ -44,7 +38,7 @@ module.exports = {
       name: "dillame-worker",
       script: "worker.py",
       interpreter: pythonInterpreter,
-      cwd: __dirname,
+      cwd: backendDir,
       env: {
         PYTHONUNBUFFERED: "1",
         WORKER_ID: "worker-01",

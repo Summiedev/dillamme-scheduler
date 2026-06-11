@@ -189,7 +189,7 @@ async def handle_failure(job: dict, error: Exception, db, redis):
     error_str = str(error)
     stack = traceback.format_exc()
 
-    if retry_count <= max_retries:
+    if retry_count < max_retries:
         delay = calculate_backoff(retry_count)
         new_scheduled = datetime.now(UTC) + timedelta(seconds=delay)
         await db.jobs.update_one(
@@ -207,12 +207,15 @@ async def handle_failure(job: dict, error: Exception, db, redis):
         wheel.schedule(job_id, new_scheduled)
         _log("retry_attempted", job_id, attempt=retry_count, max_retries=max_retries, backoff=delay)
         await write_log(db, job_id, "retry_attempted", f"Retry {retry_count}/{max_retries}: {error_str}")
+        await SSEManager.publish_worker_event("job_updated", {"job_id": job_id, "status": "pending", "retry_count": retry_count})
     else:
         # Max retries exhausted → DLQ
         await db.jobs.update_one(
             {"job_id": job_id},
             {"$set": {"status": "failed", "error": error_str, "updated_at": datetime.now(UTC)}},
         )
+        _log("job_failed", job_id, error=error_str)
+        await write_log(db, job_id, "job_failed", f"Job failed: {error_str}", {"stack_trace": stack})
         dlq_doc = {
             "job_id": job_id,
             "type": job["type"],
@@ -272,6 +275,7 @@ async def handle_success(job: dict, result: dict, db, redis):
             "effective_priority": float(job.get("priority", 2)),
         }
         await db.jobs.insert_one(new_job)
+        await SSEManager.publish_worker_event("job_updated", {"job_id": new_job["job_id"], "status": "pending", "type": new_job["type"]})
         if delay <= 3600:
             wheel.schedule(new_job["job_id"], next_run)
         _log("recurring_scheduled", new_job["job_id"], next_run_at=next_run.isoformat(), original_job=job_id)
@@ -293,6 +297,8 @@ async def process_job(job: dict, db, redis):
     claimed = await claim_job(job_id, db)
     if claimed is None:
         return  # already claimed by another worker
+
+    await SSEManager.publish_worker_event("job_updated", {"job_id": claimed["job_id"], "status": "processing"})
 
     # c. Redis lock
     if not await acquire_lock(job_id, redis):

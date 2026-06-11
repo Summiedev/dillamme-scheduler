@@ -73,7 +73,7 @@ async def retry_dlq_entry(job_id: str):
         "effective_priority": float(dlq_doc.get("priority", 2)),
     }
 
-    await db.jobs.insert_one(new_job)
+    await db.jobs.replace_one({"job_id": job_id}, new_job, upsert=True)
     await db.dlq.delete_one({"job_id": job_id})
 
     logger.info("dlq_retry", job_id=job_id)

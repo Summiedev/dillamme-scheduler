@@ -174,7 +174,7 @@ export function CreateJobPage() {
                 value={maxRetries}
                 onChange={(e) => setMaxRetries(Math.max(0, parseInt(e.target.value) || 0))}
                 min="0"
-                max="100"
+                max="10"
                 className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text font-mono"
               />
             </div>

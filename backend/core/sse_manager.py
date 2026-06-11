@@ -92,7 +92,7 @@ class SSEManager:
     async def publish_worker_event(event: str, data: dict):
         """Publish an event from the worker via Redis pub/sub."""
         redis = await get_redis()
-        payload = f"event: {event}\ndata: {json.dumps(data)}\n\n"
+        payload = f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
         await redis.publish(SSE_CHANNEL, payload)
         logger.info(
     "sse_event_published",

@@ -64,12 +64,18 @@ export function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         <StatCard
           title="Total Jobs"
           value={totalJobs}
           icon={ICONS.total}
           pulsing={connected}
+        />
+        <StatCard
+          title="Pending"
+          value={pending}
+          variant="warning"
+          icon={ICONS.running}
         />
         <StatCard
           title="Processing"
