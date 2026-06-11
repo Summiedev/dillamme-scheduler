@@ -12,16 +12,15 @@
  */
 const path = require("path");
 
-const pythonInterpreter = '/home/ubuntu/dillame-scheduler/backend/.venv/bin/python'
-const backendDir = '/home/ubuntu/dillame-scheduler/backend'
+const pythonInterpreter = "/home/ubuntu/dillamme-scheduler/backend/.venv/bin/python";
+const backendDir = "/home/ubuntu/dillamme-scheduler/backend";
 
 module.exports = {
   apps: [
     {
       name: "dillame-api",
-      script: "uvicorn",
-      args: "main:app --host 0.0.0.0 --port 8000",
-      interpreter: pythonInterpreter,
+      script: pythonInterpreter,
+      args: "-m uvicorn main:app --host 0.0.0.0 --port 8000",
       cwd: backendDir,
       env: {
         PYTHONUNBUFFERED: "1",
@@ -29,15 +28,14 @@ module.exports = {
       watch: false,
       max_restarts: 10,
       restart_delay: 5000,
-      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
       error_file: "logs/pm2-api-error.log",
       out_file: "logs/pm2-api-out.log",
-      merge_logs: true,
     },
+
     {
       name: "dillame-worker",
-      script: "worker.py",
-      interpreter: pythonInterpreter,
+      script: pythonInterpreter,
+      args: "worker.py",
       cwd: backendDir,
       env: {
         PYTHONUNBUFFERED: "1",
@@ -46,10 +44,8 @@ module.exports = {
       watch: false,
       max_restarts: 10,
       restart_delay: 5000,
-      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
       error_file: "logs/pm2-worker-error.log",
       out_file: "logs/pm2-worker-out.log",
-      merge_logs: true,
     },
   ],
 };
