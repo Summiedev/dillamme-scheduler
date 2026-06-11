@@ -326,6 +326,7 @@ async def process_job(job: dict, db, redis):
         return
 
     # e. Process
+    extender = None
     try:
         handler = get_handler(job["type"])
 
