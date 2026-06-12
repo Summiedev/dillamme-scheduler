@@ -3,15 +3,17 @@ import { useQueryClient } from '@tanstack/react-query'
 import { sseManager } from '../lib/sse'
 import { useJobStore } from '../store/jobStore'
 
-function normalizeJob(job) {
+function normalizeJob(job, previous = {}) {
   return {
+    ...previous,
     ...job,
-    id: job.job_id || job.id,
-    retryCount: job.retry_count ?? job.retryCount ?? 0,
-    scheduledAt: job.scheduled_at || job.scheduledAt,
-    createdAt: job.created_at || job.createdAt,
-    updatedAt: job.updated_at || job.updatedAt,
-    cancelRequested: job.cancel_requested ?? job.cancelRequested,
+    id: job.job_id || job.id || previous.id,
+    retryCount: job.retry_count ?? job.retryCount ?? previous.retryCount ?? 0,
+    maxRetries: job.max_retries ?? job.maxRetries ?? previous.maxRetries,
+    scheduledAt: job.scheduled_at || job.scheduledAt || previous.scheduledAt,
+    createdAt: job.created_at || job.createdAt || previous.createdAt,
+    updatedAt: job.updated_at || job.updatedAt || previous.updatedAt,
+    cancelRequested: job.cancel_requested ?? job.cancelRequested ?? previous.cancelRequested,
   }
 }
 
@@ -74,7 +76,8 @@ export function useSSE() {
       const id = job.job_id || job.id
       if (!id) return
 
-      const normalized = normalizeJob(job)
+      const currentJob = queryClient.getQueryData(['jobs', id]) || useJobStore.getState().jobs[id]
+      const normalized = normalizeJob(job, currentJob)
 
       // 1. Update zustand store (triggers UI merge immediately)
       upsertJob(normalized)

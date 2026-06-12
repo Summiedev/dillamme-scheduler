@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     lock_extend_by: int = 30  # seconds to extend
     dlq_threshold: int = 10  # count that triggers alert
     allowed_origins: list[str] = ["*"]
+    
+    alert_email: str = ""
+    alert_email_password: str = ""
+    alert_recipient: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
