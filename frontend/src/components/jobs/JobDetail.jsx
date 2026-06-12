@@ -22,7 +22,7 @@ export function JobDetail() {
   if (!job) {
     return (
       <div className="text-center py-12">
-        <p className="text-text-muted">Job not found</p>
+        <p className="text-text-muted text-base">Job not found</p>
         <Button variant="secondary" className="mt-4" onClick={() => navigate('/jobs')}>
           Back to Jobs
         </Button>
@@ -91,8 +91,8 @@ export function JobDetail() {
           {detailFields.map((field) => (
             field.value !== undefined && field.value !== null && (
               <div key={field.label}>
-                <dt className="text-2xs font-semibold uppercase tracking-wider text-text-muted">{field.label}</dt>
-                <dd className="mt-1 text-sm text-text">{field.value}</dd>
+                <dt className="text-xs font-semibold uppercase tracking-wider text-text-muted">{field.label}</dt>
+                <dd className="mt-1 text-base text-text">{field.value}</dd>
               </div>
             )
           ))}

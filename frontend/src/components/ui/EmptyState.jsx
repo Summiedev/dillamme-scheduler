@@ -14,9 +14,9 @@ export function EmptyState({ icon, title, description, actionLabel, onAction, co
           </svg>
         </div>
       )}
-      <h3 className={`font-semibold text-text-secondary ${compact ? 'text-sm' : 'text-base'}`}>{title}</h3>
+      <h3 className={`font-semibold text-text-secondary ${compact ? 'text-base' : 'text-base'}`}>{title}</h3>
       {description && (
-        <p className={`mt-1 text-text-muted text-center max-w-sm ${compact ? 'text-xs' : 'text-sm'}`}>{description}</p>
+        <p className={`mt-1 text-text-muted text-center max-w-sm ${compact ? 'text-sm' : 'text-base'}`}>{description}</p>
       )}
       {actionLabel && onAction && (
         <Button variant="primary" size="sm" className="mt-4" onClick={onAction}>

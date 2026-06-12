@@ -20,7 +20,7 @@ export function PageSpinner() {
     <div className="flex items-center justify-center py-16">
       <div className="flex flex-col items-center gap-3">
         <Spinner size="xl" />
-        <span className="text-xs text-text-muted font-mono">loading</span>
+        <span className="text-sm text-text-muted font-mono">loading</span>
       </div>
     </div>
   )

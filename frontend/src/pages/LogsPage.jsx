@@ -48,14 +48,14 @@ export function LogsPage() {
                 placeholder="Search logs..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-7 pr-2 py-1 text-xs bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted"
+                className="w-full pl-7 pr-2 py-1 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted"
               />
             </div>
             <div className="flex gap-0.5">
               {LEVELS.map((l) => (
                 <button
                   key={l}
-                  className={`px-2 py-1 text-2xs font-medium rounded transition-colors ${
+                  className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
                     level === l
                       ? 'bg-surface-200 text-text border border-surface-300'
                       : 'text-text-muted hover:text-text hover:bg-surface-100'
@@ -75,24 +75,24 @@ export function LogsPage() {
           <div className="border-t border-border mt-3">
             <div className="h-[65vh] overflow-y-auto" onScroll={handleScroll}>
               {logs.length === 0 ? (
-                <div className="flex items-center justify-center h-48 text-xs text-text-muted">
+                <div className="flex items-center justify-center h-48 text-sm text-text-muted">
                   No logs found
                 </div>
               ) : (
-                <div className="font-mono text-2xs leading-relaxed">
+                <div className="font-mono text-xs leading-relaxed">
                   {logs.map((log, idx) => (
                     <div
                       key={log.id || idx}
                       className={`border-l-2 ${LEVEL_STYLES[log.level] || 'border-l-surface-300'} px-3 py-1.5 hover:bg-surface-100/50 border-b border-border/50`}
                     >
                       <div className="flex items-start gap-2">
-                        <span className="text-text-muted shrink-0 w-16 text-2xs leading-relaxed">
+                        <span className="text-text-muted shrink-0 w-16 text-xs leading-relaxed">
                           {formatDate(log.timestamp || log.createdAt)}
                         </span>
-                        <span className={`shrink-0 w-10 font-semibold text-2xs leading-relaxed ${LEVEL_STYLES[log.level] || 'text-text-secondary'}`}>
+                        <span className={`shrink-0 w-10 font-semibold text-xs leading-relaxed ${LEVEL_STYLES[log.level] || 'text-text-secondary'}`}>
                           {log.level || 'LOG'}
                         </span>
-                        <span className="text-text-muted shrink-0 w-20 truncate text-2xs leading-relaxed" title={log.jobId || log.source}>
+                        <span className="text-text-muted shrink-0 w-20 truncate text-xs leading-relaxed" title={log.jobId || log.source}>
                           {log.jobId || log.source || '-'}
                         </span>
                         <span className="text-text leading-relaxed break-all">
@@ -101,7 +101,7 @@ export function LogsPage() {
                       </div>
                       {log.error && (
                         <div className="mt-1 ml-[7.5rem] text-danger bg-surface-200 rounded p-1.5 border border-border">
-                          <pre className="text-2xs font-mono whitespace-pre-wrap break-all">
+                          <pre className="text-xs font-mono whitespace-pre-wrap break-all">
                             {typeof log.error === 'string' ? log.error : JSON.stringify(log.error, null, 2)}
                           </pre>
                         </div>

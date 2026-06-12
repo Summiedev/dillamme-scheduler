@@ -24,7 +24,7 @@ export function JobEventLog({ events = [] }) {
 
   if (!events.length) {
     return (
-      <div className="text-center py-8 text-text-muted text-xs">
+        <div className="text-center py-8 text-text-muted text-sm">
         No events recorded
       </div>
     )
@@ -48,20 +48,20 @@ export function JobEventLog({ events = [] }) {
               <svg className="w-3.5 h-3.5 text-text-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d={EVENT_ICONS[type] || EVENT_ICONS.updated} />
               </svg>
-              <span className="text-xs text-text font-medium capitalize">{type}</span>
-              <span className="text-2xs text-text-muted font-mono">{formatDate(event.timestamp || event.createdAt)}</span>
+              <span className="text-sm text-text font-medium capitalize">{type}</span>
+              <span className="text-xs text-text-muted font-mono">{formatDate(event.timestamp || event.createdAt)}</span>
               {event.status && (
-                <span className="text-2xs text-text-secondary">{event.status}</span>
+                <span className="text-xs text-text-secondary">{event.status}</span>
               )}
             </div>
             {isExpanded && event.message && (
-              <div className="mt-1.5 ml-5.5 text-xs text-text-secondary bg-surface-100 rounded p-2 border border-border">
+              <div className="mt-1.5 ml-5.5 text-sm text-text-secondary bg-surface-100 rounded p-2 border border-border">
                 {event.message}
               </div>
             )}
             {isExpanded && event.detail && (
               <div className="mt-1 ml-5.5">
-                <pre className="text-2xs text-text-muted font-mono whitespace-pre-wrap bg-surface-100 rounded p-2 border border-border">
+                <pre className="text-xs text-text-muted font-mono whitespace-pre-wrap bg-surface-100 rounded p-2 border border-border">
                   {typeof event.detail === 'string' ? event.detail : JSON.stringify(event.detail, null, 2)}
                 </pre>
               </div>

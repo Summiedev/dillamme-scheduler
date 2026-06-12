@@ -50,7 +50,7 @@ export function DashboardPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <PulseIndicator variant="danger" size="md" pulsing />
-              <span className="text-sm font-medium text-danger">{alertCount} failed message{alertCount > 1 ? 's' : ''} in dead letter queue</span>
+              <span className="text-base font-medium text-danger">{alertCount} failed message{alertCount > 1 ? 's' : ''} in dead letter queue</span>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="secondary" size="xs" onClick={() => { clearAlerts(); navigate('/dlq') }}>
@@ -115,19 +115,19 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader>
-              <CardTitle className="text-sm font-semibold">Live Activity</CardTitle>
+              <CardTitle className="text-base font-semibold">Live Activity</CardTitle>
             <PulseIndicator variant="success" size="sm" pulsing={connected} />
           </CardHeader>
           <div className="space-y-1 max-h-48 overflow-y-auto">
             {alerts.length === 0 ? (
-              <div className="text-center py-6 text-text-muted text-xs">No recent activity</div>
+              <div className="text-center py-6 text-text-muted text-sm">No recent activity</div>
             ) : (
               alerts.slice(0, 10).map((alert, idx) => (
                 <div key={alert.id || idx} className="flex items-start gap-2 px-2 py-1.5 rounded bg-surface-100/50">
                   <PulseIndicator variant="danger" size="sm" pulsing={false} />
                   <div className="min-w-0">
-                    <p className="text-sm text-text truncate">{alert.message || 'DLQ alert'}</p>
-                    <p className="text-xs text-text-muted font-mono">{alert.timestamp || alert.createdAt}</p>
+                    <p className="text-base text-text truncate">{alert.message || 'DLQ alert'}</p>
+                    <p className="text-sm text-text-muted font-mono">{alert.timestamp || alert.createdAt}</p>
                   </div>
                 </div>
               ))

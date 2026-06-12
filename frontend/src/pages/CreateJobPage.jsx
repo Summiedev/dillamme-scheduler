@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCreateJob } from '../hooks/useJobs'
+import { jobsApi } from '../lib/api'
 import { Card, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { JsonViewer } from '../components/ui/JsonViewer'
@@ -10,9 +11,28 @@ import toast from 'react-hot-toast'
 const JOB_TYPES = ['send_email', 'webhook', 'log_processing']
 
 const TYPE_EXAMPLES = {
-  send_email: { to: '', subject: '' },
-  webhook: { url: '', method: 'POST', body: {} },
-  log_processing: { message: '', level: 'info' },
+  send_email: {
+    to: 'user@example.com',
+    subject: 'Your weekly report is ready',
+    body: 'Hi there, your report has been generated.',
+  },
+  webhook: {
+    url: 'https://webhook.site/test',
+    method: 'POST',
+    body: {
+      event: 'job.completed',
+      timestamp: '2026-06-12T00:00:00Z',
+    },
+  },
+  log_processing: {
+    message: 'User login event detected',
+    level: 'info',
+    source: 'auth-service',
+    metadata: {
+      user_id: 'u_12345',
+      ip: '192.168.1.1',
+    },
+  },
 }
 
 const PRIORITY_OPTIONS = [
@@ -131,8 +151,29 @@ function TypeIcon({ type }) {
   )
 }
 
+async function fetchAllJobs() {
+  const limit = 500
+  let offset = 0
+  const allJobs = []
+
+  while (true) {
+    const response = await jobsApi.list({ limit, offset })
+    const jobs = Array.isArray(response.jobs) ? response.jobs : []
+    allJobs.push(...jobs)
+
+    if (jobs.length < limit || (response.total != null && allJobs.length >= response.total)) {
+      break
+    }
+
+    offset += limit
+  }
+
+  return allJobs
+}
+
 export function CreateJobPage({ open = false, onClose = () => {} }) {
   const createJob = useCreateJob()
+  const dropdownRef = useRef(null)
 
   const [mounted, setMounted] = useState(open)
   const [active, setActive] = useState(false)
@@ -143,7 +184,11 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
   const [interval, setInterval] = useState('')
   const [maxRetries, setMaxRetries] = useState('3')
   const [dependencies, setDependencies] = useState([])
-  const [depInput, setDepInput] = useState('')
+  const [dependencyJobs, setDependencyJobs] = useState([])
+  const [dependencySearch, setDependencySearch] = useState('')
+  const [dependencyOpen, setDependencyOpen] = useState(false)
+  const [dependencyLoading, setDependencyLoading] = useState(false)
+  const [dependencyError, setDependencyError] = useState('')
   const [errors, setErrors] = useState(INITIAL_ERRORS)
   const [submitted, setSubmitted] = useState(false)
 
@@ -159,7 +204,11 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
       setInterval('')
       setMaxRetries('3')
       setDependencies([])
-      setDepInput('')
+      setDependencyJobs([])
+      setDependencySearch('')
+      setDependencyOpen(false)
+      setDependencyLoading(false)
+      setDependencyError('')
       setErrors(INITIAL_ERRORS)
       setSubmitted(false)
 
@@ -176,6 +225,48 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
     }
   }, [open])
 
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDependencyOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadJobs = async () => {
+      if (!dependencyOpen || !mounted) return
+      setDependencyLoading(true)
+      setDependencyError('')
+      try {
+        const jobs = await fetchAllJobs()
+        if (!cancelled) {
+          setDependencyJobs(jobs)
+        }
+      } catch {
+        if (!cancelled) {
+          setDependencyJobs([])
+          setDependencyError('Unable to load jobs')
+        }
+      } finally {
+        if (!cancelled) {
+          setDependencyLoading(false)
+        }
+      }
+    }
+
+    loadJobs()
+
+    return () => {
+      cancelled = true
+    }
+  }, [dependencyOpen, mounted])
+
   const parsedPayload = useMemo(() => {
     try {
       return payloadRaw && payloadRaw.trim() ? JSON.parse(payloadRaw) : null
@@ -189,6 +280,31 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
     [type, payloadRaw, priority, maxRetries]
   )
 
+  const dependencyMap = useMemo(() => {
+    const map = new Map()
+    for (const job of dependencyJobs) {
+      map.set(job.job_id, job)
+    }
+    for (const job of dependencies) {
+      if (!map.has(job.job_id)) {
+        map.set(job.job_id, job)
+      }
+    }
+    return map
+  }, [dependencyJobs, dependencies])
+
+  const filteredDependencyJobs = useMemo(() => {
+    const selectedIds = new Set(dependencies.map((job) => job.job_id))
+    const search = dependencySearch.trim().toLowerCase()
+
+    return dependencyJobs.filter((job) => {
+      if (selectedIds.has(job.job_id)) return false
+      if (!search) return true
+      const haystack = `${job.job_id} ${job.type || ''} ${job.status || ''}`.toLowerCase()
+      return haystack.includes(search)
+    })
+  }, [dependencyJobs, dependencies, dependencySearch])
+
   useEffect(() => {
     if (submitted) {
       setErrors(currentErrors)
@@ -200,19 +316,16 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
     setPayloadRaw(formatPayload(value))
   }
 
-  const handleAddDependency = () => {
-    const trimmed = depInput.trim()
-    if (!trimmed) return
-    if (dependencies.includes(trimmed)) {
-      toast.error('Dependency already added')
+  const handleAddDependency = (job) => {
+    if (dependencies.some((item) => item.job_id === job.job_id)) {
       return
     }
-    setDependencies([...dependencies, trimmed])
-    setDepInput('')
+    setDependencies([...dependencies, job])
+    setDependencySearch('')
   }
 
   const handleRemoveDependency = (jobId) => {
-    setDependencies(dependencies.filter((d) => d !== jobId))
+    setDependencies(dependencies.filter((job) => job.job_id !== jobId))
   }
 
   const handleSubmit = (e) => {
@@ -238,7 +351,7 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
       interval: interval || undefined,
       max_retries: Number.parseInt(maxRetries, 10),
-      dependencies: dependencies.length ? dependencies : undefined,
+      dependencies: dependencies.length ? dependencies.map((job) => job.job_id) : undefined,
     }
 
     createJob.mutate(body, {
@@ -280,10 +393,10 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
             <TypeIcon type={type} />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 id="create-job-title" className="text-sm font-semibold text-text">
+            <h2 id="create-job-title" className="text-base font-semibold text-text">
               Create Job
             </h2>
-            <p className="text-2xs text-text-muted">
+            <p className="text-sm text-text-muted">
               Configure the job, then submit it to the scheduler
             </p>
           </div>
@@ -307,7 +420,7 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
               </CardHeader>
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Type</label>
+                  <label className="text-sm font-medium text-text-secondary">Type</label>
                   <select
                     value={type}
                     onChange={(e) => handleTypeChange(e.target.value)}
@@ -318,17 +431,17 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
                     <option value="webhook">webhook</option>
                     <option value="log_processing">log_processing</option>
                   </select>
-                  {errors.type && <p className="text-2xs text-danger font-mono">{errors.type}</p>}
+                  {errors.type && <p className="text-sm text-danger font-mono">{errors.type}</p>}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Priority</label>
+                  <label className="text-sm font-medium text-text-secondary">Priority</label>
                   <div className="flex gap-1.5">
                     {PRIORITY_OPTIONS.map((opt) => (
                       <button
                         key={opt.value}
                         type="button"
-                        className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors capitalize ${
+                        className={`px-2.5 py-1.5 text-base font-medium rounded-md border transition-colors capitalize ${
                           priority === opt.value
                             ? 'bg-accent-subtle/20 text-accent border-accent-muted/50'
                             : 'bg-surface-100 text-text-secondary border-border hover:text-text hover:bg-surface-200'
@@ -339,11 +452,11 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
                       </button>
                     ))}
                   </div>
-                  {errors.priority && <p className="text-2xs text-danger font-mono">{errors.priority}</p>}
+                  {errors.priority && <p className="text-sm text-danger font-mono">{errors.priority}</p>}
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Scheduled At</label>
+                  <label className="text-sm font-medium text-text-secondary">Scheduled At</label>
                   <input
                     type="datetime-local"
                     value={scheduledAt}
@@ -353,7 +466,7 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Interval</label>
+                  <label className="text-sm font-medium text-text-secondary">Interval</label>
                   <select
                     value={interval}
                     onChange={(e) => setInterval(e.target.value)}
@@ -369,7 +482,7 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Max Retries</label>
+                  <label className="text-sm font-medium text-text-secondary">Max Retries</label>
                   <input
                     type="number"
                     value={maxRetries}
@@ -378,7 +491,7 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
                     max="10"
                     className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text font-mono"
                   />
-                  {errors.maxRetries && <p className="text-2xs text-danger font-mono">{errors.maxRetries}</p>}
+                  {errors.maxRetries && <p className="text-sm text-danger font-mono">{errors.maxRetries}</p>}
                 </div>
               </div>
             </Card>
@@ -387,35 +500,73 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
               <CardHeader>
                 <CardTitle>Dependencies</CardTitle>
               </CardHeader>
-              <div className="space-y-2">
-                <div className="flex gap-2">
+              <div className="space-y-2" ref={dropdownRef}>
+                <div className="relative">
                   <input
                     type="text"
-                    value={depInput}
-                    onChange={(e) => setDepInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddDependency())}
-                    placeholder="Enter job ID to depend on..."
-                    className="flex-1 px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted font-mono"
+                    value={dependencySearch}
+                    onChange={(e) => {
+                      setDependencySearch(e.target.value)
+                      setDependencyOpen(true)
+                    }}
+                    onFocus={() => setDependencyOpen(true)}
+                    placeholder="Search jobs to depend on..."
+                    className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted font-mono"
                   />
-                  <Button type="button" variant="secondary" size="sm" onClick={handleAddDependency}>
-                    Add
-                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setDependencyOpen((value) => !value)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+                    aria-label="Toggle dependency dropdown"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
                 </div>
+
+                {dependencyOpen && (
+                  <div className="rounded-md border border-border bg-surface-0 shadow-sm max-h-52 overflow-y-auto">
+                    {dependencyLoading ? (
+                      <div className="px-3 py-2 text-base text-text-muted">Loading jobs...</div>
+                    ) : dependencyError ? (
+                      <div className="px-3 py-2 text-base text-text-muted">{dependencyError}</div>
+                    ) : dependencyJobs.length === 0 ? (
+                      <div className="px-3 py-2 text-base text-text-muted">No jobs available</div>
+                    ) : filteredDependencyJobs.length === 0 ? (
+                      <div className="px-3 py-2 text-base text-text-muted">
+                        {dependencySearch.trim() ? 'No matching jobs found' : 'No jobs available'}
+                      </div>
+                    ) : (
+                      filteredDependencyJobs.map((job) => (
+                        <button
+                          key={job.job_id}
+                          type="button"
+                          onClick={() => handleAddDependency(job)}
+                          className="w-full text-left px-3 py-2 text-base text-text hover:bg-surface-100 border-b border-border/50 last:border-b-0"
+                        >
+                          <span className="font-mono">
+                            {job.job_id.slice(0, 12)} — {job.type || '-'} — {job.status || '-'}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+
                 {dependencies.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {dependencies.map((dep) => (
+                    {dependencies.map((job) => (
                       <span
-                        key={dep}
-                        className="inline-flex items-center gap-1.5 px-2 py-1 bg-surface-200 text-text-secondary text-xs rounded-sm border border-surface-300"
+                        key={job.job_id}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 bg-surface-200 text-text-secondary text-base rounded-sm border border-surface-300"
                       >
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                        </svg>
-                        <span className="font-mono">{dep.slice(0, 12)}</span>
+                        <span className="font-mono">{job.job_id.slice(0, 12)}</span>
+                        <span className="text-text-muted font-mono">{job.type || '-'}</span>
                         <button
                           type="button"
                           className="text-text-muted hover:text-danger ml-1"
-                          onClick={() => handleRemoveDependency(dep)}
+                          onClick={() => handleRemoveDependency(job.job_id)}
                         >
                           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -444,13 +595,13 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
                     onChange={(e) => setPayloadRaw(e.target.value)}
                     placeholder={formatPayload(type)}
                     rows={10}
-                    className="w-full px-2.5 py-2 text-xs font-mono bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted resize-none"
+                    className="w-full px-2.5 py-2 text-sm font-mono bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted resize-none"
                     spellCheck={false}
                   />
-                  {errors.payload && <p className="text-2xs text-danger font-mono">{errors.payload}</p>}
+                  {errors.payload && <p className="text-sm text-danger font-mono">{errors.payload}</p>}
                 </div>
                 <div className="border border-border rounded-md overflow-hidden">
-                  <div className="px-2.5 py-1.5 text-2xs font-semibold uppercase tracking-wider text-text-muted bg-surface-100 border-b border-border">
+                  <div className="px-2.5 py-1.5 text-sm font-semibold uppercase tracking-wider text-text-muted bg-surface-100 border-b border-border">
                     Preview
                   </div>
                   {parsedPayload ? (
@@ -458,7 +609,7 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
                       <JsonViewer data={parsedPayload} />
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center h-32 text-xs text-text-muted">
+                    <div className="flex items-center justify-center h-32 text-base text-text-muted">
                       {payloadRaw ? 'Invalid JSON' : 'Enter JSON to preview'}
                     </div>
                   )}

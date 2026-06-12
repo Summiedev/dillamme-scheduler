@@ -81,21 +81,21 @@ export function DLQPage() {
                           </button>
                         </Td>
                         <Td>
-                          <span className="font-mono text-xs text-text-secondary">{truncate(msg.id, 12)}</span>
+                          <span className="font-mono text-sm text-text-secondary">{truncate(msg.id, 12)}</span>
                         </Td>
                         <Td>
-                          <span className="font-mono text-xs text-accent">{truncate(msg.job_id || msg.jobId, 12)}</span>
+                          <span className="font-mono text-sm text-accent">{truncate(msg.job_id || msg.jobId, 12)}</span>
                         </Td>
                         <Td className="max-w-xs">
                           <div className="flex items-center gap-1.5">
                             <PulseIndicator variant="danger" size="sm" pulsing={false} />
-                            <span className="text-xs text-danger truncate block" title={typeof errorDetail === 'string' ? errorDetail : ''}>
+                            <span className="text-sm text-danger truncate block" title={typeof errorDetail === 'string' ? errorDetail : ''}>
                               {typeof errorDetail === 'string' ? truncate(errorDetail, 60) : 'Error occurred'}
                             </span>
                           </div>
                         </Td>
-                        <Td className="hidden md:table-cell text-xs text-text-muted font-mono">{formatDate(msg.failedAt || msg.createdAt)}</Td>
-                        <Td className="hidden sm:table-cell text-xs text-text-muted font-mono">{msg.retryCount ?? 0}</Td>
+                        <Td className="hidden md:table-cell text-sm text-text-muted font-mono">{formatDate(msg.failedAt || msg.createdAt)}</Td>
+                        <Td className="hidden sm:table-cell text-sm text-text-muted font-mono">{msg.retryCount ?? 0}</Td>
                         <Td>
                           <Button size="xs" variant="secondary" onClick={() => handleRetry(msg.job_id || msg.jobId)} loading={retry.isPending}>
                             Retry
@@ -118,32 +118,32 @@ export function DLQPage() {
                 return (
                   <div key={`detail-${msg.id || idx}`} className="p-3 bg-surface-100 animate-fade-in space-y-3">
                     <div>
-                      <h4 className="text-2xs font-semibold uppercase tracking-wider text-text-muted mb-1">Error Details</h4>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-1">Error Details</h4>
                       <div className="bg-surface-200 rounded-md p-2.5 border border-border">
-                        <pre className="text-xs text-danger font-mono whitespace-pre-wrap break-all">
+                        <pre className="text-sm text-danger font-mono whitespace-pre-wrap break-all">
                           {typeof errorDetail === 'string' ? errorDetail : JSON.stringify(errorDetail, null, 2)}
                         </pre>
                       </div>
                     </div>
                     {(msg.stack_trace || msg.stack) && (
   <div>
-    <h4 className="text-2xs font-semibold uppercase tracking-wider text-text-muted mb-1">
+    <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-1">
       Stack Trace
     </h4>
-    <pre className="text-2xs text-text-secondary font-mono whitespace-pre-wrap bg-surface-200 rounded p-2 border border-border max-h-32 overflow-y-auto">
+    <pre className="text-xs text-text-secondary font-mono whitespace-pre-wrap bg-surface-200 rounded p-2 border border-border max-h-32 overflow-y-auto">
       {msg.stack_trace || msg.stack}
     </pre>
   </div>
 )}
                     {payload && (
                       <div>
-                        <h4 className="text-2xs font-semibold uppercase tracking-wider text-text-muted mb-1">Message Payload</h4>
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-1">Message Payload</h4>
                         <JsonViewer data={payload} />
                       </div>
                     )}
                     {msg.headers && (
                       <div>
-                        <h4 className="text-2xs font-semibold uppercase tracking-wider text-text-muted mb-1">Headers</h4>
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-1">Headers</h4>
                         <JsonViewer data={msg.headers} />
                       </div>
                     )}

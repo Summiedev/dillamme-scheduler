@@ -41,7 +41,7 @@ export function TopBar({ onMenuClick }) {
         {alertCount > 0 && (
           <button
             onClick={() => { navigate('/dlq'); clearAlerts() }}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-danger-subtle/20 text-danger text-2xs font-medium hover:bg-danger-subtle/30 transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-danger-subtle/20 text-danger text-xs font-medium hover:bg-danger-subtle/30 transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
             {alertCount} DLQ
@@ -53,7 +53,7 @@ export function TopBar({ onMenuClick }) {
             size="sm"
             pulsing={sseStatus === 'connected'}
           />
-          <span className={`text-2xs font-mono font-medium ${
+          <span className={`text-xs font-mono font-medium ${
             sseStatus === 'connected' ? 'text-success' :
             sseStatus === 'reconnecting' ? 'text-warning' :
             'text-text-muted'
@@ -64,10 +64,10 @@ export function TopBar({ onMenuClick }) {
           </span>
         </div>
         {isError && (
-          <span className="text-2xs text-danger font-mono hidden md:inline">connection failed</span>
+          <span className="text-xs text-danger font-mono hidden md:inline">connection failed</span>
         )}
         {sseStatus === 'reconnecting' && (
-          <span className="text-2xs text-warning font-mono hidden md:inline">{retryCount}/5</span>
+          <span className="text-xs text-warning font-mono hidden md:inline">{retryCount}/5</span>
         )}
       </div>
     </header>

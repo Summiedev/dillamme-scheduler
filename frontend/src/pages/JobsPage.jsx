@@ -77,11 +77,11 @@ export function JobsPage() {
             placeholder="Search jobs..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            className="w-full pl-8 pr-3 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted"
+            className="w-full pl-8 pr-3 py-1.5 text-base bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted"
           />
         </div>
         <SegmentedControl options={STATUS_OPTIONS} value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1) }} size="xs" />
-        <span className="text-2xs text-text-muted font-mono ml-auto">{total} result{total !== 1 ? 's' : ''}</span>
+        <span className="text-xs text-text-muted font-mono ml-auto">{total} result{total !== 1 ? 's' : ''}</span>
       </div>
 
       {isLoading ? (
@@ -119,25 +119,25 @@ export function JobsPage() {
                   return (
                     <Tr key={job.id} onClick={() => openDrawer(job.id)}>
                       <Td>
-                        <span className="text-sm font-mono text-text">{job.id?.slice(0, 12)}</span>
+                        <span className="text-base font-mono text-text">{job.id?.slice(0, 12)}</span>
                       </Td>
-                      <Td className="text-sm text-text-secondary">{job.type || '-'}</Td>
+                      <Td className="text-base text-text-secondary">{job.type || '-'}</Td>
                       <Td><StatusBadge status={job.status} /></Td>
                       <Td className="hidden md:table-cell">
                         {priorityLabel && (
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-sm font-mono font-medium ${priorityColor?.bg || 'bg-surface-200'} ${priorityColor?.text || 'text-text-muted'} border ${priorityColor?.border || 'border-surface-300'}`}>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-base font-mono font-medium ${priorityColor?.bg || 'bg-surface-200'} ${priorityColor?.text || 'text-text-muted'} border ${priorityColor?.border || 'border-surface-300'}`}>
                             {priorityLabel}
                           </span>
                         )}
                       </Td>
-                      <Td className="hidden sm:table-cell text-sm text-text-muted font-mono">{job.retryCount ?? 0}/{job.maxRetries ?? '-'}</Td>
-                      <Td className="hidden lg:table-cell text-sm text-text-muted font-mono" title={formatDate(job.scheduledAt)}>
+                      <Td className="hidden sm:table-cell text-base text-text-muted font-mono">{job.retryCount ?? 0}/{job.maxRetries ?? '-'}</Td>
+                      <Td className="hidden lg:table-cell text-base text-text-muted font-mono" title={formatDate(job.scheduledAt)}>
                         {job.scheduledAt ? timeAgo(job.scheduledAt) : '-'}
                       </Td>
-                      <Td className="hidden lg:table-cell text-sm text-text-muted font-mono">
+                      <Td className="hidden lg:table-cell text-base text-text-muted font-mono">
                         {job.interval || '-'}
                       </Td>
-                      <Td className="hidden sm:table-cell text-sm text-text-muted font-mono" title={formatDate(job.createdAt)}>
+                      <Td className="hidden sm:table-cell text-base text-text-muted font-mono" title={formatDate(job.createdAt)}>
                         {timeAgo(job.createdAt)}
                       </Td>
                       <Td>
@@ -171,7 +171,7 @@ export function JobsPage() {
           </div>
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-3 py-2.5 border-t border-border">
-              <span className="text-2xs text-text-muted font-mono">Page {page} of {totalPages}</span>
+              <span className="text-xs text-text-muted font-mono">Page {page} of {totalPages}</span>
               <div className="flex items-center gap-1">
                 <Button size="xs" variant="ghost" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</Button>
                 <Button size="xs" variant="ghost" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>

@@ -21,7 +21,7 @@ export function Sidebar({ onClose }) {
           </svg>
         </div>
         <span className="text-base font-semibold text-text tracking-tight">Dilamme</span>
-        <span className="ml-auto text-2xs text-text-muted font-mono">v1.0.0</span>
+        <span className="ml-auto text-xs text-text-muted font-mono">v1.0.0</span>
       </div>
 
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
@@ -32,7 +32,7 @@ export function Sidebar({ onClose }) {
             end={item.path === '/'}
             onClick={onClose}
             className={({ isActive }) =>
-              `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ${
+              `flex items-center gap-2.5 px-3 py-2 rounded-md text-base font-medium transition-all duration-150 ${
                 isActive
                   ? 'bg-accent-subtle/20 text-accent shadow-sm'
                   : 'text-text-secondary hover:text-text hover:bg-surface-100'
@@ -44,7 +44,7 @@ export function Sidebar({ onClose }) {
             </svg>
             <span>{item.label}</span>
             {item.badge && alertCount > 0 && (
-              <span className="ml-auto bg-danger text-white text-2xs font-bold px-1.5 py-0.5 rounded-sm min-w-[18px] text-center">
+              <span className="ml-auto bg-danger text-white text-xs font-bold px-1.5 py-0.5 rounded-sm min-w-[18px] text-center">
                 {alertCount > 99 ? '99+' : alertCount}
               </span>
             )}

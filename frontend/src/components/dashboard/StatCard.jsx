@@ -21,15 +21,15 @@ export function StatCard({ title, value, subtitle, icon, trend, variant = 'defau
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold uppercase tracking-wider text-text-muted">{title}</p>
+            <p className="text-base font-semibold uppercase tracking-wider text-text-muted">{title}</p>
             {pulsing && <PulseIndicator variant="accent" size="sm" />}
           </div>
           <p className="mt-1 text-3xl font-bold text-text font-mono tracking-tight">{value ?? '-'}</p>
           {subtitle && (
-            <p className="mt-0.5 text-2xs text-text-secondary">{subtitle}</p>
+            <p className="mt-0.5 text-xs text-text-secondary">{subtitle}</p>
           )}
           {trend !== undefined && (
-            <p className={`mt-0.5 text-2xs font-mono font-medium ${trend >= 0 ? 'text-success' : 'text-danger'}`}>
+            <p className={`mt-0.5 text-xs font-mono font-medium ${trend >= 0 ? 'text-success' : 'text-danger'}`}>
               <svg className={`w-3 h-3 inline mr-0.5 ${trend >= 0 ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
               </svg>

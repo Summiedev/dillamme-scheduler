@@ -44,7 +44,7 @@ export function JobDrawer({ jobId, open, onClose }) {
       {isLoading ? (
         <div className="flex items-center justify-center py-16"><Spinner size="lg" /></div>
       ) : !job ? (
-        <div className="text-center py-16 text-text-muted text-sm">Job not found</div>
+        <div className="text-center py-16 text-text-muted text-base">Job not found</div>
       ) : (
         <div className="p-4 space-y-4">
           <div className="flex items-center gap-2">
@@ -69,8 +69,8 @@ export function JobDrawer({ jobId, open, onClose }) {
               ['Interval', job.interval || '-'],
             ].map(([label, value]) => (
               <div key={label}>
-                <dt className="text-2xs font-semibold uppercase tracking-wider text-text-muted">{label}</dt>
-                <dd className="mt-0.5 text-xs text-text font-mono break-all">{value}</dd>
+                <dt className="text-xs font-semibold uppercase tracking-wider text-text-muted">{label}</dt>
+                <dd className="mt-0.5 text-sm text-text font-mono break-all">{value}</dd>
               </div>
             ))}
           </div>
@@ -87,23 +87,23 @@ export function JobDrawer({ jobId, open, onClose }) {
 
           {job.error && (
             <div>
-              <h4 className="text-xs font-semibold text-text mb-1.5">Error</h4>
+              <h4 className="text-sm font-semibold text-text mb-1.5">Error</h4>
               <div className="bg-surface-100 border border-border rounded-md p-2.5">
-                <pre className="text-xs text-danger font-mono whitespace-pre-wrap break-all">{typeof job.error === 'string' ? job.error : JSON.stringify(job.error, null, 2)}</pre>
+                <pre className="text-sm text-danger font-mono whitespace-pre-wrap break-all">{typeof job.error === 'string' ? job.error : JSON.stringify(job.error, null, 2)}</pre>
               </div>
             </div>
           )}
 
           {job.data && (
             <div>
-              <h4 className="text-xs font-semibold text-text mb-1.5">Payload</h4>
+              <h4 className="text-sm font-semibold text-text mb-1.5">Payload</h4>
               <JsonViewer data={job.data} />
             </div>
           )}
 
           {job.result && (
             <div>
-              <h4 className="text-xs font-semibold text-text mb-1.5">Result</h4>
+              <h4 className="text-sm font-semibold text-text mb-1.5">Result</h4>
               <JsonViewer data={job.result} />
             </div>
           )}

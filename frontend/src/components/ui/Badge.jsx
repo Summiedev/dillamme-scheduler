@@ -8,9 +8,9 @@ const variants = {
 }
 
 const sizes = {
-  sm: 'px-1.5 py-0.5 text-2xs',
-  md: 'px-2 py-0.5 text-xs',
-  lg: 'px-2.5 py-1 text-xs',
+  sm: 'px-1.5 py-0.5 text-xs',
+  md: 'px-2 py-0.5 text-sm',
+  lg: 'px-2.5 py-1 text-sm',
 }
 
 export function Badge({ children, variant = 'default', size = 'md', className = '' }) {
