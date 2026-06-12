@@ -30,11 +30,15 @@ const PIE_COLORS = {
 
 const EVENT_VARIANTS = {
   job_created: 'accent',
+  job_started: 'neutral',
+  retry_attempted: 'warning',
   job_updated: 'success',
   job_deleted: 'danger',
   job_cancelled: 'warning',
   job_failed: 'danger',
+  job_failed_dlq: 'danger',
   job_completed: 'success',
+  email_sent: 'success',
   default: 'neutral',
 }
 

@@ -472,6 +472,34 @@ async def handle_success(job: dict, result: dict, db, redis):
 
     _log("job_completed", job_id)
     await write_log(db, job_id, "job_completed", "Job completed successfully", result)
+
+    if job.get("type") == "send_email":
+        recipient = (job.get("payload") or {}).get("to")
+        subject = (job.get("payload") or {}).get("subject")
+        email_payload = {
+            "job_id": job_id,
+            "to": recipient,
+            "subject": subject,
+            "message_id": result.get("message_id"),
+            "status": "sent",
+            "sent_at": now.isoformat(),
+        }
+        await write_log(
+            db,
+            job_id,
+            "email_sent",
+            f"Email sent to {recipient}",
+            {
+                "to": recipient,
+                "subject": subject,
+                "message_id": result.get("message_id"),
+            },
+        )
+        try:
+            await SSEManager.publish_worker_event("email_sent", email_payload)
+        except Exception as exc:
+            logger.error("email_sent_event_failed", job_id=job_id, error=str(exc))
+
     try:
         await SSEManager.publish_worker_event("job_updated", {"job_id": job_id, "status": "completed"})
     except Exception as exc:

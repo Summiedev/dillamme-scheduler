@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { sseManager } from '../lib/sse'
 import { useJobStore } from '../store/jobStore'
+import { useActivityStore } from '../store/activityStore'
 
 function normalizeJob(job, previous = {}) {
   return {
@@ -52,6 +53,92 @@ function upsertJobInCache(cache, job) {
   return cache
 }
 
+function formatActivityFromJob(job) {
+  const jobType = job.type || 'job'
+  const jobId = job.id
+
+  if (job.status === 'processing') {
+    return {
+      id: `${jobId}-processing-${job.updatedAt || Date.now()}`,
+      event: 'job_started',
+      title: 'Job started',
+      message: `${jobType} is now processing`,
+      jobId,
+      timestamp: job.updatedAt || job.createdAt || new Date().toISOString(),
+      tone: 'accent',
+    }
+  }
+
+  if (job.status === 'pending') {
+    if ((job.retryCount ?? 0) > 0) {
+      return {
+        id: `${jobId}-retry-${job.retryCount}-${job.updatedAt || Date.now()}`,
+        event: 'retry_attempted',
+        title: 'Retry scheduled',
+        message: `Attempt ${job.retryCount}/${job.maxRetries || '-'} will run again soon`,
+        jobId,
+        timestamp: job.updatedAt || job.createdAt || new Date().toISOString(),
+        tone: 'warning',
+      }
+    }
+
+    return {
+      id: `${jobId}-created-${job.createdAt || Date.now()}`,
+      event: 'job_created',
+      title: 'Job created',
+      message: `${jobType} queued and waiting to run`,
+      jobId,
+      timestamp: job.createdAt || job.updatedAt || new Date().toISOString(),
+      tone: 'accent',
+    }
+  }
+
+  if (job.status === 'completed') {
+    if (jobType === 'send_email') {
+      return null
+    }
+
+    return {
+      id: `${jobId}-completed-${job.updatedAt || Date.now()}`,
+      event: 'job_completed',
+      title: 'Job completed',
+      message: `${jobType} finished successfully`,
+      jobId,
+      timestamp: job.updatedAt || job.createdAt || new Date().toISOString(),
+      tone: 'success',
+    }
+  }
+
+  if (job.status === 'failed') {
+    const movedToDlq = Boolean(job.dlq?.active)
+    return {
+      id: `${jobId}-${movedToDlq ? 'dlq' : 'failed'}-${job.updatedAt || Date.now()}`,
+      event: movedToDlq ? 'job_failed_dlq' : 'job_failed',
+      title: movedToDlq ? 'Moved to DLQ' : 'Job failed',
+      message: movedToDlq
+        ? `${jobType} exhausted its retries and entered the DLQ`
+        : `${jobType} failed and will retry`,
+      jobId,
+      timestamp: job.updatedAt || job.createdAt || new Date().toISOString(),
+      tone: 'danger',
+    }
+  }
+
+  if (job.status === 'cancelled') {
+    return {
+      id: `${jobId}-cancelled-${job.updatedAt || Date.now()}`,
+      event: 'job_cancelled',
+      title: 'Job cancelled',
+      message: `${jobType} will not be processed`,
+      jobId,
+      timestamp: job.updatedAt || job.createdAt || new Date().toISOString(),
+      tone: 'warning',
+    }
+  }
+
+  return null
+}
+
 export function useSSE() {
   const queryClient = useQueryClient()
   const cleanupRef = useRef(null)
@@ -59,6 +146,8 @@ export function useSSE() {
   const upsertJob = useJobStore((s) => s.upsertJob)
   const removeJob = useJobStore((s) => s.removeJob)
   const setLoading = useJobStore((s) => s.setLoading)
+  const pushActivity = useActivityStore((s) => s.pushActivity)
+  const showEmailAlert = useActivityStore((s) => s.showEmailAlert)
 
   useEffect(() => {
     setLoading()
@@ -95,6 +184,30 @@ export function useSSE() {
         queryKey: ['logs'],
         refetchType: 'active',
       })
+
+      const activity = formatActivityFromJob(normalized)
+      if (activity) {
+        pushActivity(activity)
+      }
+    })
+
+    const unsubEmailSent = sseManager.subscribe('email_sent', 'email_sent', (data) => {
+      const activity = {
+        id: `${data.job_id || data.message_id || Date.now()}-email-sent`,
+        event: 'email_sent',
+        title: 'Email sent',
+        message: `Email sent to ${data.to || 'recipient'}`,
+        jobId: data.job_id,
+        timestamp: data.sent_at || new Date().toISOString(),
+        tone: 'success',
+      }
+      pushActivity(activity)
+      showEmailAlert({
+        ...activity,
+        to: data.to || '',
+        subject: data.subject || '',
+        messageId: data.message_id || '',
+      })
     })
 
     const unsubJobDeleted = sseManager.subscribe('job_deleted', 'job_deleted', (data) => {
@@ -130,6 +243,7 @@ export function useSSE() {
       unsubState()
       unsubReconnect()
       unsubJobUpdated()
+      unsubEmailSent()
       unsubJobDeleted()
       unsubDlqThreshold()
       sseManager.disconnect()
@@ -140,5 +254,5 @@ export function useSSE() {
         cleanupRef.current()
       }
     }
-  }, [setSSEStatus, upsertJob, removeJob, setLoading, queryClient])
+  }, [setSSEStatus, upsertJob, removeJob, setLoading, pushActivity, showEmailAlert, queryClient])
 }

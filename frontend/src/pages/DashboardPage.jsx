@@ -1,15 +1,17 @@
 import { useMetrics } from '../hooks/useMetrics'
-import { useJobs } from '../hooks/useJobs'
 import { useDLQStore } from '../store/dlqStore'
 import { useJobStore } from '../store/jobStore'
 import { PageShell } from '../components/layout/PageShell'
 import { StatCard } from '../components/dashboard/StatCard'
 import { Card, CardHeader, CardTitle } from '../components/ui/Card'
+import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { PulseIndicator } from '../components/ui/PulseIndicator'
 import { PageSpinner } from '../components/ui/Spinner'
 import { useNavigate } from 'react-router-dom'
 import { STATUS } from '../constants/status'
+import { useActivityStore } from '../store/activityStore'
+import { timeAgo } from '../lib/utils'
 
 const ICONS = {
   total: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
@@ -23,8 +25,8 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const { data: metrics, isLoading: metricsLoading } = useMetrics()
   const alertCount = useDLQStore((s) => s.alertCount)
-  const alerts = useDLQStore((s) => s.alerts)
   const clearAlerts = useDLQStore((s) => s.clearAlerts)
+  const activities = useActivityStore((s) => s.activities)
   const sseStatus = useJobStore((s) => s.sseStatus)
   const connected = sseStatus === 'connected'
 
@@ -118,16 +120,32 @@ export function DashboardPage() {
               <CardTitle className="text-base font-semibold">Live Activity</CardTitle>
             <PulseIndicator variant="success" size="sm" pulsing={connected} />
           </CardHeader>
-          <div className="space-y-1 max-h-48 overflow-y-auto">
-            {alerts.length === 0 ? (
-              <div className="text-center py-6 text-text-muted text-sm">No recent activity</div>
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            {activities.length === 0 ? (
+              <div className="text-center py-8 text-text-muted text-sm">
+                Waiting for live activity
+              </div>
             ) : (
-              alerts.slice(0, 10).map((alert, idx) => (
-                <div key={alert.id || idx} className="flex items-start gap-2 px-2 py-1.5 rounded bg-surface-100/50">
-                  <PulseIndicator variant="danger" size="sm" pulsing={false} />
-                  <div className="min-w-0">
-                    <p className="text-base text-text truncate">{alert.message || 'DLQ alert'}</p>
-                    <p className="text-sm text-text-muted font-mono">{alert.timestamp || alert.createdAt}</p>
+              activities.slice(0, 10).map((activity, idx) => (
+                <div key={activity.id || idx} className="flex items-start gap-2 rounded-md border border-border bg-surface-100/50 px-2.5 py-2">
+                  <PulseIndicator
+                    variant={activity.tone === 'danger' ? 'danger' : activity.tone === 'warning' ? 'warning' : activity.tone === 'success' ? 'success' : 'accent'}
+                    size="sm"
+                    pulsing={false}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={activity.tone || 'neutral'} size="sm">
+                        {activity.title || activity.event || 'Activity'}
+                      </Badge>
+                      <span className="text-xs text-text-muted font-mono">
+                        {timeAgo(activity.timestamp || activity.createdAt)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-text truncate">{activity.message || 'Live activity'}</p>
+                    <p className="text-xs text-text-muted font-mono truncate">
+                      {activity.jobId ? `job: ${activity.jobId}` : activity.event || 'activity'}
+                    </p>
                   </div>
                 </div>
               ))

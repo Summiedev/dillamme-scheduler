@@ -83,6 +83,9 @@ function createSingletonSSE() {
     eventSource.addEventListener('job_deleted', (e) => {
       notifyListeners('job_deleted', JSON.parse(e.data))
     })
+    eventSource.addEventListener('email_sent', (e) => {
+      notifyListeners('email_sent', JSON.parse(e.data))
+    })
   }
 
   function disconnect() {
