@@ -79,25 +79,23 @@ Two independent OS processes managed by PM2. They never import each other. All c
 
 ## Tech Stack
 
-| Dependency | Version | Purpose |
-|---|---|---|
-| `fastapi` | ≥ 0.110 | Async web framework; handles routing, request validation, SSE streaming |
-| `uvicorn[standard]` | ≥ 0.29 | ASGI server; runs the FastAPI app |
-| `motor` | ≥ 3.3 | Async MongoDB driver; all DB operations are non-blocking |
-| `redis` | ≥ 5.0 | Async Redis client; pub/sub bridge between worker and API, NX locks |
-| `pydantic` | ≥ 2.6 | Request/response validation and data modelling |
-| `pydantic-settings` | ≥ 2.2 | Typed settings loaded from `.env` |
-| `structlog` | ≥ 24.1 | Structured JSON logging; every significant event is a structured log entry |
-| `python-dotenv` | ≥ 1.0 | `.env` file loading |
-| `aiofiles` | ≥ 23.2 | Async file I/O used by log handler |
-| `python-multipart` | ≥ 0.0.9 | Multipart form parsing (FastAPI dependency) |
-| React + Vite | — | Frontend SPA; dashboard, jobs table, create form, DLQ view |
-| TailwindCSS | — | Utility-first CSS |
-| TanStack Query | — | Server-state management; cache invalidation on SSE events |
-| PM2 | — | Process manager; keeps API and worker alive, restarts on crash |
-| Nginx | — | Reverse proxy; TLS termination, SSE buffering disabled for `/api/events` |
-| MongoDB | — | Primary persistence; compound indexes serve as the database-layer priority queue |
-| Redis | — | In-memory pub/sub and distributed locking |
+* `fastapi` ≥ 0.110
+* `uvicorn[standard]` ≥ 0.29
+* `motor` ≥ 3.3
+* `redis` ≥ 5.0
+* `pydantic` ≥ 2.6
+* `pydantic-settings` ≥ 2.2
+* `structlog` ≥ 24.1
+* `python-dotenv` ≥ 1.0
+* `aiofiles` ≥ 23.2
+* `python-multipart` ≥ 0.0.9
+* React + Vite
+* TailwindCSS
+* TanStack Query
+* PM2
+* Nginx
+* MongoDB
+* Redis
 
 ---
 
