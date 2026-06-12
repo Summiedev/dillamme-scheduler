@@ -1,5 +1,4 @@
 import { useState, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useJobs, useCancelJob, useRetryJob, useDeleteJob } from '../hooks/useJobs'
 import { PageShell } from '../components/layout/PageShell'
 import { Card, CardHeader, CardTitle } from '../components/ui/Card'
@@ -10,6 +9,7 @@ import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { PageSpinner, InlineSpinner } from '../components/ui/Spinner'
 import { EmptyState } from '../components/ui/EmptyState'
 import { JobDrawer } from '../components/jobs/JobDrawer'
+import { CreateJobPage } from './CreateJobPage'
 import { formatDate, timeAgo } from '../lib/utils'
 import { STATUS } from '../constants/status'
 import { PRIORITY, PRIORITY_LABELS, PRIORITY_COLORS } from '../constants/priority'
@@ -21,12 +21,12 @@ const STATUS_OPTIONS = [
 ]
 
 export function JobsPage() {
-  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [selectedJobId, setSelectedJobId] = useState(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const cancelJob = useCancelJob()
   const retryJob = useRetryJob()
@@ -59,7 +59,7 @@ export function JobsPage() {
       title="Jobs"
       description="Monitor and manage scheduled jobs"
       actions={
-        <Button size="sm" onClick={() => navigate('/jobs/create')}>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
@@ -92,7 +92,7 @@ export function JobsPage() {
             title="No jobs found"
             description={search || statusFilter ? 'Try adjusting your filters' : 'Create your first job to get started'}
             actionLabel={!search && !statusFilter ? 'Create Job' : undefined}
-            onAction={() => navigate('/jobs/create')}
+            onAction={() => setCreateOpen(true)}
           />
         </Card>
       ) : (
@@ -142,7 +142,6 @@ export function JobsPage() {
                       </Td>
                       <Td>
                         <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-                         
                           {(job.status === STATUS.PENDING || job.status === STATUS.PROCESSING) && (
                             <Button size="xs" variant="ghost" onClick={(e) => handleAction(cancelJob, job.id, e)} title="Cancel">
                               <svg className="w-3.5 h-3.5 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -183,6 +182,7 @@ export function JobsPage() {
       )}
 
       <JobDrawer jobId={selectedJobId} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <CreateJobPage open={createOpen} onClose={() => setCreateOpen(false)} />
     </PageShell>
   )
 }

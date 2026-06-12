@@ -6,7 +6,6 @@ import { useLocation, useNavigate } from 'react-router-dom'
 const PAGE_TITLES = {
   '/': 'Dashboard',
   '/jobs': 'Jobs',
-  '/jobs/create': 'Create Job',
   '/metrics': 'Metrics',
   '/dlq': 'Dead Letter Queue',
   '/logs': 'Logs',

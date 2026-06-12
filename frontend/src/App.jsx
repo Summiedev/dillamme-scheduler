@@ -5,7 +5,6 @@ import { AppLayout } from './components/layout/AppLayout'
 import { DashboardPage } from './pages/DashboardPage'
 import { JobsPage } from './pages/JobsPage'
 import { JobDetailPage } from './pages/JobDetailPage'
-import { CreateJobPage } from './pages/CreateJobPage'
 import { MetricsPage } from './pages/MetricsPage'
 import { DLQPage } from './pages/DLQPage'
 import { LogsPage } from './pages/LogsPage'
@@ -54,7 +53,6 @@ function App() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/jobs" element={<JobsPage />} />
-            <Route path="/jobs/create" element={<CreateJobPage />} />
             <Route path="/jobs/:id" element={<JobDetailPage />} />
             <Route path="/metrics" element={<MetricsPage />} />
             <Route path="/dlq" element={<DLQPage />} />

@@ -33,9 +33,12 @@ export function cancelRequest() {
 
 export const jobsApi = {
   list(params) {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request(`/jobs${qs}`)
-  },
+  const filtered = params ? Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== 'undefined' && v !== '')
+  ) : {}
+  const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
+  return request(`/jobs${qs}`)
+},
   get(id) {
     return request(`/jobs/${id}`)
   },
@@ -75,9 +78,12 @@ export const metricsApi = {
 
 export const dlqApi = {
   list(params) {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request(`/dlq${qs}`)
-  },
+  const filtered = params ? Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== 'undefined' && v !== '')
+  ) : {}
+  const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
+  return request(`/jobs${qs}`)
+},
   get(id) {
     return request(`/dlq/${id}`)
   },
@@ -94,9 +100,12 @@ export const dlqApi = {
 
 export const logsApi = {
   list(params) {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request(`/logs${qs}`)
-  },
+  const filtered = params ? Object.fromEntries(
+    Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== 'undefined' && v !== '')
+  ) : {}
+  const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
+  return request(`/jobs${qs}`)
+},
   get(id) {
     return request(`/logs/${id}`)
   },

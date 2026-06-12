@@ -1,23 +1,18 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { useCreateJob } from '../hooks/useJobs'
-import { PageShell } from '../components/layout/PageShell'
 import { Card, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { TagInput } from '../components/ui/TagInput'
 import { JsonViewer } from '../components/ui/JsonViewer'
 import { Badge } from '../components/ui/Badge'
 import { PRIORITY, PRIORITY_LABELS } from '../constants/priority'
 import toast from 'react-hot-toast'
 
-function validatePayload(value) {
-  if (!value || !value.trim()) return { valid: true, error: null }
-  try {
-    JSON.parse(value)
-    return { valid: true, error: null }
-  } catch (e) {
-    return { valid: false, error: e.message }
-  }
+const JOB_TYPES = ['send_email', 'webhook', 'log_processing']
+
+const TYPE_EXAMPLES = {
+  send_email: { to: '', subject: '' },
+  webhook: { url: '', method: 'POST', body: {} },
+  log_processing: { message: '', level: 'info' },
 }
 
 const PRIORITY_OPTIONS = [
@@ -32,25 +27,177 @@ const INTERVAL_OPTIONS = [
   { value: 'every_1_hour', label: 'Every 1 Hour' },
 ]
 
-export function CreateJobPage() {
-  const navigate = useNavigate()
+const INITIAL_ERRORS = {
+  type: '',
+  payload: '',
+  priority: '',
+  maxRetries: '',
+}
+
+function formatPayload(type) {
+  return JSON.stringify(TYPE_EXAMPLES[type], null, 2)
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function validatePayload(type, payloadRaw) {
+  if (!payloadRaw || !payloadRaw.trim()) {
+    return 'Payload is required'
+  }
+
+  let payload
+  try {
+    payload = JSON.parse(payloadRaw)
+  } catch {
+    return 'Payload must be valid JSON'
+  }
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return 'Payload must be a JSON object'
+  }
+
+  if (type === 'send_email') {
+    if (!isValidEmail(String(payload.to || ''))) {
+      return 'Payload must include a valid "to" email address'
+    }
+    if (!String(payload.subject || '').trim()) {
+      return 'Payload must include a non-empty "subject"'
+    }
+  }
+
+  if (type === 'webhook') {
+    const url = String(payload.url || '')
+    if (!/^https?:\/\/.+/i.test(url)) {
+      return 'Payload must include a url starting with http:// or https://'
+    }
+  }
+
+  if (type === 'log_processing') {
+    if (!String(payload.message || '').trim()) {
+      return 'Payload must include a non-empty "message"'
+    }
+  }
+
+  return ''
+}
+
+function validateForm({ type, payloadRaw, priority, maxRetries }) {
+  const errors = { ...INITIAL_ERRORS }
+
+  if (!type || !JOB_TYPES.includes(type)) {
+    errors.type = 'Job type is required'
+  }
+
+  const payloadError = validatePayload(type, payloadRaw)
+  if (payloadError) {
+    errors.payload = payloadError
+  }
+
+  if (priority === undefined || priority === null || priority === '') {
+    errors.priority = 'Priority is required'
+  }
+
+  const parsedMaxRetries = Number.parseInt(maxRetries, 10)
+  if (!Number.isInteger(parsedMaxRetries) || parsedMaxRetries < 0 || parsedMaxRetries > 10) {
+    errors.maxRetries = 'Max retries must be between 0 and 10'
+  }
+
+  return errors
+}
+
+function TypeIcon({ type }) {
+  if (type === 'webhook') {
+    return (
+      <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7 8V6a5 5 0 0110 0v2m-6 4h2m-4 0h.01M6 10h12a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6a2 2 0 012-2z" />
+      </svg>
+    )
+  }
+
+  if (type === 'log_processing') {
+    return (
+      <svg className="w-4 h-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg className="w-4 h-4 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13l4-4m0 0l4 4m-4-4v12m10-7a4 4 0 10-8 0v7m8-7a4 4 0 018 0v7" />
+    </svg>
+  )
+}
+
+export function CreateJobPage({ open = false, onClose = () => {} }) {
   const createJob = useCreateJob()
 
-  const [type, setType] = useState('')
-  const [payloadRaw, setPayloadRaw] = useState('')
+  const [mounted, setMounted] = useState(open)
+  const [active, setActive] = useState(false)
+  const [type, setType] = useState('send_email')
+  const [payloadRaw, setPayloadRaw] = useState(formatPayload('send_email'))
   const [priority, setPriority] = useState(PRIORITY.MEDIUM)
   const [scheduledAt, setScheduledAt] = useState('')
   const [interval, setInterval] = useState('')
-  const [maxRetries, setMaxRetries] = useState(3)
-  const [tags, setTags] = useState([])
+  const [maxRetries, setMaxRetries] = useState('3')
   const [dependencies, setDependencies] = useState([])
   const [depInput, setDepInput] = useState('')
+  const [errors, setErrors] = useState(INITIAL_ERRORS)
+  const [submitted, setSubmitted] = useState(false)
 
-  const { valid: payloadValid, error: payloadError } = validatePayload(payloadRaw)
+  useEffect(() => {
+    let timer
 
-  let parsedPayload = null
-  if (payloadRaw && payloadRaw.trim()) {
-    try { parsedPayload = JSON.parse(payloadRaw) } catch {}
+    if (open) {
+      setMounted(true)
+      setType('send_email')
+      setPayloadRaw(formatPayload('send_email'))
+      setPriority(PRIORITY.MEDIUM)
+      setScheduledAt('')
+      setInterval('')
+      setMaxRetries('3')
+      setDependencies([])
+      setDepInput('')
+      setErrors(INITIAL_ERRORS)
+      setSubmitted(false)
+
+      requestAnimationFrame(() => setActive(true))
+    } else {
+      setActive(false)
+      timer = window.setTimeout(() => setMounted(false), 200)
+    }
+
+    return () => {
+      if (timer) {
+        window.clearTimeout(timer)
+      }
+    }
+  }, [open])
+
+  const parsedPayload = useMemo(() => {
+    try {
+      return payloadRaw && payloadRaw.trim() ? JSON.parse(payloadRaw) : null
+    } catch {
+      return null
+    }
+  }, [payloadRaw])
+
+  const currentErrors = useMemo(
+    () => validateForm({ type, payloadRaw, priority, maxRetries }),
+    [type, payloadRaw, priority, maxRetries]
+  )
+
+  useEffect(() => {
+    if (submitted) {
+      setErrors(currentErrors)
+    }
+  }, [currentErrors, submitted])
+
+  const handleTypeChange = (value) => {
+    setType(value)
+    setPayloadRaw(formatPayload(value))
   }
 
   const handleAddDependency = () => {
@@ -70,213 +217,268 @@ export function CreateJobPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!type.trim()) {
-      toast.error('Job type is required')
-      return
-    }
-    if (payloadRaw && payloadRaw.trim() && !payloadValid) {
-      toast.error('Invalid JSON payload')
+    setSubmitted(true)
+
+    const nextErrors = validateForm({ type, payloadRaw, priority, maxRetries })
+    setErrors(nextErrors)
+
+    if (Object.values(nextErrors).some(Boolean)) {
       return
     }
 
+    let payload = undefined
+    try {
+      payload = JSON.parse(payloadRaw)
+    } catch {}
+
     const body = {
-      type: type.trim(),
-      payload: parsedPayload || undefined,
+      type,
+      payload,
       priority,
       scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
       interval: interval || undefined,
-      max_retries: maxRetries,
-      tags: tags.length ? tags : undefined,
+      max_retries: Number.parseInt(maxRetries, 10),
       dependencies: dependencies.length ? dependencies : undefined,
     }
 
     createJob.mutate(body, {
       onSuccess: () => {
         toast.success('Job created successfully')
-        navigate('/jobs')
+        onClose()
       },
       onError: () => toast.error('Failed to create job'),
     })
   }
 
+  if (!mounted) {
+    return null
+  }
+
   return (
-    <PageShell
-      title="Create Job"
-      description="Define a new scheduled job"
-      actions={
-        <Button variant="ghost" size="xs" onClick={() => navigate('/jobs')}>
-          Cancel
-        </Button>
-      }
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-200 ${
+        active ? 'opacity-100' : 'opacity-0'
+      }`}
+      onClick={onClose}
     >
-      <form onSubmit={handleSubmit} className="max-w-3xl space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Configuration</CardTitle>
-          </CardHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Type <span className="text-danger">*</span></label>
-              <input
-                type="text"
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                placeholder="webhook, email, report..."
-                className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted"
-                autoFocus
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Priority</label>
-              <div className="flex gap-1.5">
-                {PRIORITY_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors capitalize ${
-                      priority === opt.value
-                        ? 'bg-accent-subtle/20 text-accent border-accent-muted/50'
-                        : 'bg-surface-100 text-text-secondary border-border hover:text-text hover:bg-surface-200'
-                    }`}
-                    onClick={() => setPriority(opt.value)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Scheduled At</label>
-              <input
-                type="datetime-local"
-                value={scheduledAt}
-                onChange={(e) => setScheduledAt(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text font-mono"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Interval</label>
-              <select
-                value={interval}
-                onChange={(e) => setInterval(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text"
-              >
-                <option value="">None (one-time)</option>
-                {INTERVAL_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-text-secondary">Max Retries</label>
-              <input
-                type="number"
-                value={maxRetries}
-                onChange={(e) => setMaxRetries(Math.max(0, parseInt(e.target.value) || 0))}
-                min="0"
-                max="10"
-                className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text font-mono"
-              />
-            </div>
+      <div
+        className={`absolute inset-0 bg-surface-950/70 backdrop-blur-sm transition-opacity duration-200 ${
+          active ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-job-title"
+        className={`relative z-10 flex w-full max-w-[600px] max-h-[85vh] flex-col overflow-hidden rounded-xl border border-border bg-surface-0 shadow-2xl transition-all duration-200 ${
+          active ? 'scale-100 translate-y-0 opacity-100' : 'scale-95 translate-y-2 opacity-0'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-surface-100 border border-border">
+            <TypeIcon type={type} />
           </div>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Tags</CardTitle>
-          </CardHeader>
-          <TagInput tags={tags} onChange={setTags} placeholder="Add tag and press Enter..." />
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Dependencies</CardTitle>
-          </CardHeader>
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={depInput}
-                onChange={(e) => setDepInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddDependency())}
-                placeholder="Enter job ID to depend on..."
-                className="flex-1 px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted font-mono"
-              />
-              <Button type="button" variant="secondary" size="sm" onClick={handleAddDependency}>Add</Button>
-            </div>
-            {dependencies.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {dependencies.map((dep) => (
-                  <span key={dep} className="inline-flex items-center gap-1.5 px-2 py-1 bg-surface-200 text-text-secondary text-xs rounded-sm border border-surface-300">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
-                    <span className="font-mono">{dep.slice(0, 12)}</span>
-                    <button
-                      type="button"
-                      className="text-text-muted hover:text-danger ml-1"
-                      onClick={() => handleRemoveDependency(dep)}
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+          <div className="min-w-0 flex-1">
+            <h2 id="create-job-title" className="text-sm font-semibold text-text">
+              Create Job
+            </h2>
+            <p className="text-2xs text-text-muted">
+              Configure the job, then submit it to the scheduler
+            </p>
           </div>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Payload</CardTitle>
-            {payloadRaw && payloadRaw.trim() && (
-              <Badge variant={payloadValid ? 'success' : 'danger'}>
-                {payloadValid ? 'Valid JSON' : 'Invalid JSON'}
-              </Badge>
-            )}
-          </CardHeader>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <textarea
-                value={payloadRaw}
-                onChange={(e) => setPayloadRaw(e.target.value)}
-                placeholder='{"key": "value"}'
-                rows={10}
-                className="w-full px-2.5 py-2 text-xs font-mono bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted resize-none"
-                spellCheck={false}
-              />
-              {!payloadValid && payloadError && (
-                <p className="mt-1 text-2xs text-danger font-mono">{payloadError}</p>
-              )}
-            </div>
-            <div className="border border-border rounded-md overflow-hidden">
-              <div className="px-2.5 py-1.5 text-2xs font-semibold uppercase tracking-wider text-text-muted bg-surface-100 border-b border-border">
-                Preview
-              </div>
-              {parsedPayload ? (
-                <div className="p-2">
-                  <JsonViewer data={parsedPayload} />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-32 text-xs text-text-muted">
-                  {payloadRaw ? 'Invalid JSON' : 'Enter JSON to preview'}
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        <div className="flex items-center gap-2 pt-2">
-          <Button type="submit" loading={createJob.isPending}>
-            Create Job
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => navigate('/jobs')}>
-            Cancel
-          </Button>
+          <button
+            type="button"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-text-muted hover:text-text hover:bg-surface-100"
+            onClick={onClose}
+            aria-label="Close modal"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-      </form>
-    </PageShell>
+
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuration</CardTitle>
+              </CardHeader>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-text-secondary">Type</label>
+                  <select
+                    value={type}
+                    onChange={(e) => handleTypeChange(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text"
+                    autoFocus
+                  >
+                    <option value="send_email">send_email</option>
+                    <option value="webhook">webhook</option>
+                    <option value="log_processing">log_processing</option>
+                  </select>
+                  {errors.type && <p className="text-2xs text-danger font-mono">{errors.type}</p>}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-text-secondary">Priority</label>
+                  <div className="flex gap-1.5">
+                    {PRIORITY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors capitalize ${
+                          priority === opt.value
+                            ? 'bg-accent-subtle/20 text-accent border-accent-muted/50'
+                            : 'bg-surface-100 text-text-secondary border-border hover:text-text hover:bg-surface-200'
+                        }`}
+                        onClick={() => setPriority(opt.value)}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {errors.priority && <p className="text-2xs text-danger font-mono">{errors.priority}</p>}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-text-secondary">Scheduled At</label>
+                  <input
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-text-secondary">Interval</label>
+                  <select
+                    value={interval}
+                    onChange={(e) => setInterval(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text"
+                  >
+                    <option value="">None (one-time)</option>
+                    {INTERVAL_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-text-secondary">Max Retries</label>
+                  <input
+                    type="number"
+                    value={maxRetries}
+                    onChange={(e) => setMaxRetries(e.target.value)}
+                    min="0"
+                    max="10"
+                    className="w-full px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text font-mono"
+                  />
+                  {errors.maxRetries && <p className="text-2xs text-danger font-mono">{errors.maxRetries}</p>}
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Dependencies</CardTitle>
+              </CardHeader>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={depInput}
+                    onChange={(e) => setDepInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddDependency())}
+                    placeholder="Enter job ID to depend on..."
+                    className="flex-1 px-2.5 py-1.5 text-sm bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted font-mono"
+                  />
+                  <Button type="button" variant="secondary" size="sm" onClick={handleAddDependency}>
+                    Add
+                  </Button>
+                </div>
+                {dependencies.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {dependencies.map((dep) => (
+                      <span
+                        key={dep}
+                        className="inline-flex items-center gap-1.5 px-2 py-1 bg-surface-200 text-text-secondary text-xs rounded-sm border border-surface-300"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                        <span className="font-mono">{dep.slice(0, 12)}</span>
+                        <button
+                          type="button"
+                          className="text-text-muted hover:text-danger ml-1"
+                          onClick={() => handleRemoveDependency(dep)}
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Payload</CardTitle>
+                {payloadRaw && payloadRaw.trim() && (
+                  <Badge variant={parsedPayload ? 'success' : 'danger'}>
+                    {parsedPayload ? 'Valid JSON' : 'Invalid JSON'}
+                  </Badge>
+                )}
+              </CardHeader>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <textarea
+                    value={payloadRaw}
+                    onChange={(e) => setPayloadRaw(e.target.value)}
+                    placeholder={formatPayload(type)}
+                    rows={10}
+                    className="w-full px-2.5 py-2 text-xs font-mono bg-surface-100 border border-border rounded-md focus:outline-none focus:border-accent-muted focus:ring-1 focus:ring-accent/30 text-text placeholder:text-text-muted resize-none"
+                    spellCheck={false}
+                  />
+                  {errors.payload && <p className="text-2xs text-danger font-mono">{errors.payload}</p>}
+                </div>
+                <div className="border border-border rounded-md overflow-hidden">
+                  <div className="px-2.5 py-1.5 text-2xs font-semibold uppercase tracking-wider text-text-muted bg-surface-100 border-b border-border">
+                    Preview
+                  </div>
+                  {parsedPayload ? (
+                    <div className="p-2">
+                      <JsonViewer data={parsedPayload} />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-32 text-xs text-text-muted">
+                      {payloadRaw ? 'Invalid JSON' : 'Enter JSON to preview'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <div className="border-t border-border bg-surface-0/95 px-4 py-3 sm:px-5 sm:py-4 backdrop-blur">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <Button type="button" variant="ghost" onClick={onClose} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button type="submit" loading={createJob.isPending} className="w-full sm:w-auto">
+                Create Job
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }

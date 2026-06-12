@@ -233,7 +233,7 @@ async def handle_failure(job: dict, error: Exception, db, redis):
             "failed_at": datetime.now(UTC),
             "created_at": datetime.now(UTC),
         }
-        await db.dlq.insert_one(dlq_doc)
+        await db.dlq.replace_one({"job_id": job_id}, dlq_doc, upsert=True)
         _log("job_failed_dlq", job_id, error=error_str)
         await write_log(db, job_id, "job_failed_dlq", f"Moved to DLQ: {error_str}", {"stack_trace": stack})
         await SSEManager.publish_worker_event("job_updated", {"job_id": job_id, "status": "failed"})
