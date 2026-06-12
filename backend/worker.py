@@ -355,20 +355,21 @@ async def schedule_recurring_job(job: dict, db):
 async def handle_failure(job: dict, error: Exception, db, redis):
     """Handle a failed job: retry with backoff or move to DLQ."""
     job_id = job["job_id"]
-    retry_count = job.get("retry_count", 0) + 1
+    retry_count = job.get("retry_count", 0)
+    next_retry_count = retry_count + 1
     max_retries = job.get("max_retries", 3)
     error_str = str(error)
     stack = traceback.format_exc()
 
-    if retry_count < max_retries:
-        delay = calculate_backoff(retry_count)
+    if next_retry_count <= max_retries:
+        delay = calculate_backoff(next_retry_count)
         new_scheduled = datetime.now(UTC) + timedelta(seconds=delay)
         await db.jobs.update_one(
             {"job_id": job_id},
             {
                 "$set": {
                     "status": "pending",
-                    "retry_count": retry_count,
+                    "retry_count": next_retry_count,
                     "scheduled_at": new_scheduled,
                     "error": error_str,
                     "updated_at": datetime.now(UTC),
@@ -378,9 +379,9 @@ async def handle_failure(job: dict, error: Exception, db, redis):
             },
         )
         wheel.schedule(job_id, new_scheduled)
-        _log("retry_attempted", job_id, attempt=retry_count, max_retries=max_retries, backoff=delay)
-        await write_log(db, job_id, "retry_attempted", f"Retry {retry_count}/{max_retries}: {error_str}")
-        await SSEManager.publish_worker_event("job_updated", {"job_id": job_id, "status": "pending", "retry_count": retry_count})
+        _log("retry_attempted", job_id, attempt=next_retry_count, max_retries=max_retries, backoff=delay)
+        await write_log(db, job_id, "retry_attempted", f"Retry {next_retry_count}/{max_retries}: {error_str}")
+        await SSEManager.publish_worker_event("job_updated", {"job_id": job_id, "status": "pending", "retry_count": next_retry_count})
     else:
         # Max retries exhausted → DLQ
         failed_at = datetime.now(UTC)
@@ -398,6 +399,7 @@ async def handle_failure(job: dict, error: Exception, db, redis):
                     "status": "failed",
                     "error": error_str,
                     "updated_at": failed_at,
+                    "retry_count": retry_count,
                     "dlq": dlq_doc,
                 }
             },
