@@ -38,8 +38,8 @@ function upsertJobInCache(cache, job) {
     const nextData = Array.isArray(cache.data) ? upsertIntoArray(cache.data) : cache.data
     return {
       ...cache,
-      ...(Array.isArray(cache.jobs) ? { jobs: nextJobs } : null),
-      ...(Array.isArray(cache.data) ? { data: nextData } : null),
+      ...(Array.isArray(cache.jobs) ? { jobs: nextJobs } : {}),
+      ...(Array.isArray(cache.data) ? { data: nextData } : {}),
     }
   }
 
@@ -72,24 +72,43 @@ export function useSSE() {
     const unsubJobUpdated = sseManager.subscribe('job_updated', 'job_updated', (data) => {
       const job = data.job || data
       const id = job.job_id || job.id
-      if (id) {
-        const normalized = normalizeJob(job)
-        upsertJob(normalized)
-        queryClient.setQueriesData({ queryKey: ['jobs'] }, (cache) => upsertJobInCache(cache, normalized))
-        queryClient.setQueryData(['jobs', id], normalized)
-        queryClient.invalidateQueries({ queryKey: ['jobs'], refetchType: 'active' })
-        queryClient.invalidateQueries({ queryKey: ['metrics'], refetchType: 'active' })
-      }
+      if (!id) return
+
+      const normalized = normalizeJob(job)
+
+      // 1. Update zustand store (triggers UI merge immediately)
+      upsertJob(normalized)
+
+      // 2. Directly update the React Query cache for the individual job
+      queryClient.setQueryData(['jobs', id], normalized)
+
+      // 3. Update all list query caches in-place (no refetch needed)
+      queryClient.setQueriesData(
+        { queryKey: ['jobs'], type: 'active' },
+        (cache) => upsertJobInCache(cache, normalized),
+      )
     })
 
     const unsubJobDeleted = sseManager.subscribe('job_deleted', 'job_deleted', (data) => {
       const id = data.job_id
-      if (id) {
-        removeJob(id)
-        queryClient.removeQueries({ queryKey: ['jobs', id] })
-        queryClient.invalidateQueries({ queryKey: ['jobs'], refetchType: 'active' })
-        queryClient.invalidateQueries({ queryKey: ['metrics'], refetchType: 'active' })
-      }
+      if (!id) return
+
+      removeJob(id)
+      queryClient.removeQueries({ queryKey: ['jobs', id] })
+
+      // Remove from all list caches
+      queryClient.setQueriesData(
+        { queryKey: ['jobs'], type: 'active' },
+        (cache) => {
+          if (!cache) return cache
+          const removeFromArray = (items = []) =>
+            items.filter((item) => (item?.id || item?.job_id) !== id)
+          if (Array.isArray(cache)) return removeFromArray(cache)
+          if (Array.isArray(cache.jobs)) return { ...cache, jobs: removeFromArray(cache.jobs) }
+          if (Array.isArray(cache.data)) return { ...cache, data: removeFromArray(cache.data) }
+          return cache
+        },
+      )
     })
 
     const unsubDlqThreshold = sseManager.subscribe('dlq_threshold', 'dlq_threshold', () => {

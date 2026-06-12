@@ -220,18 +220,16 @@ Workload: 10,000 jobs, mixed priorities, scheduled within a 60-second window. 10
 
 **Published reference numbers** (from `docs/benchmark.md`, single-machine run):
 
-| Operation | Count | Time (s) | Throughput |
-|---|---|---|---|
-| Heap insert | 10,000 | 0.113 | 88,417 ops/s |
-| Heap extract | 10,000 | 0.025 | 396,482 ops/s |
-| Wheel schedule | 10,000 | 0.068 | 147,989 ops/s |
-| Wheel tick (full rotation) | 3,600 ticks | 0.010 | 346,111 ticks/s |
-| MongoDB query (indexed) | 100k docs, top 100 | 0.052 s/query | ~19 queries/s |
-| MongoDB query (no index) | 100k docs, top 100 | 0.005 s/query | ~193 queries/s |
+Benchmark          | Workload                      | Mean (ms) | P50 (ms) | P95 (ms) | Stddev (ms)
+-------------------+-------------------------------+-----------+----------+----------+------------
+PriorityQueue      | insert 10,000, drain in order | 64.787    | 61.406   | 93.935   | 14.797
+TimingWheel + Heap | insert 10,000, drain in order | 58.859    | 52.317   | 96.654   | 20.088
+Mongo indexed      | 50,000 docs, top 100          | 2.033     | 1.807    | 3.464    | 0.899
+Mongo no index     | 50,000 docs, top 100          | 222.606   | 224.324  | 257.556  | 27.143
 
 **Tradeoffs:**
 
-- The heap alone is simpler and faster for workloads where all jobs are immediately due. It has no concept of time — every job pushed is immediately eligible.
+- The heap alone is simpler and faster for workloads where all jobs are immediately due. It has no concept of time ,so every job pushed is immediately eligible.
 - The timing wheel adds a time dimension. Jobs are not pushed to the heap until their second arrives, which keeps the heap small and avoids processing jobs before their scheduled time. The cost is the overhead of ticking the wheel on every loop iteration and the 1-hour horizon limit.
 - The MongoDB indexed query is slower per call than the in-memory structures but is the authoritative source of truth and handles persistence, crash recovery, and multi-worker scenarios.
 
