@@ -65,6 +65,8 @@ async def check_worker(db) -> str:
         for worker in workers:
             last_seen = worker.get("last_seen")
             if last_seen:
+                if last_seen.tzinfo is None:
+                    last_seen = last_seen.replace(tzinfo=UTC)
                 elapsed = (now - last_seen).total_seconds()
                 if elapsed <= alive_threshold:
                     alive_count += 1
