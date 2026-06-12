@@ -8,13 +8,15 @@ function normalizeJob(job, previous = {}) {
   return {
     ...previous,
     ...job,
-    id: job.job_id || job.id || previous.id,
-    retryCount: job.retry_count ?? job.retryCount ?? previous.retryCount ?? 0,
-    maxRetries: job.max_retries ?? job.maxRetries ?? previous.maxRetries,
-    scheduledAt: job.scheduled_at || job.scheduledAt || previous.scheduledAt,
-    createdAt: job.created_at || job.createdAt || previous.createdAt,
-    updatedAt: job.updated_at || job.updatedAt || previous.updatedAt,
-    cancelRequested: job.cancel_requested ?? job.cancelRequested ?? previous.cancelRequested,
+    id: job.job_id || job.id || previous.id || previous.job_id,
+    retryCount: job.retry_count ?? job.retryCount ?? previous.retryCount ?? previous.retry_count ?? 0,
+    maxRetries: job.max_retries ?? job.maxRetries ?? previous.maxRetries ?? previous.max_retries,
+    type: job.type || previous.type || 'job',
+    scheduledAt: job.scheduled_at || job.scheduledAt || previous.scheduledAt || previous.scheduled_at,
+    createdAt: job.created_at || job.createdAt || previous.createdAt || previous.created_at,
+    updatedAt: job.updated_at || job.updatedAt || previous.updatedAt || previous.updated_at,
+    cancelRequested: job.cancel_requested ?? job.cancelRequested ?? previous.cancelRequested ?? previous.cancel_requested ?? false,
+    status: job.status || previous.status || 'pending',
   }
 }
 

@@ -46,25 +46,32 @@ class SSEManager:
                 pass
 
     async def _subscribe_redis(self):
-        redis = await get_redis()
-        pubsub = redis.pubsub()
-        await pubsub.subscribe(SSE_CHANNEL)
-        logger.info("sse_redis_subscriber_started", channel=SSE_CHANNEL)
-        try:
-            async for message in pubsub.listen():
-                if message["type"] == "message":
-                    data = message["data"]
-                    dead: list[SSEClient] = []
-                    for client in list(self.clients):
-                        try:
-                            client.queue.put_nowait(data)
-                        except QueueFull:
-                            dead.append(client)
-                    for client in dead:
-                        await self.disconnect(client)
-        except asyncio.CancelledError:
-            await pubsub.unsubscribe(SSE_CHANNEL)
-            raise
+        while True:
+            try:
+                redis = await get_redis()
+                pubsub = redis.pubsub()
+                await pubsub.subscribe(SSE_CHANNEL)
+                logger.info("sse_redis_subscriber_started", channel=SSE_CHANNEL)
+                try:
+                    async for message in pubsub.listen():
+                        if message["type"] == "message":
+                            data = message["data"]
+                            dead: list[SSEClient] = []
+                            for client in list(self.clients):
+                                try:
+                                    client.queue.put_nowait(data)
+                                except QueueFull:
+                                    dead.append(client)
+                            for client in dead:
+                                await self.disconnect(client)
+                except asyncio.CancelledError:
+                    await pubsub.unsubscribe(SSE_CHANNEL)
+                    raise
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.error("sse_subscriber_error", error=str(exc), channel=SSE_CHANNEL)
+                await asyncio.sleep(5)
 
     async def connect(self) -> SSEClient:
         """Register a new SSE client. Returns a client handle the stream reads from."""
