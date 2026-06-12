@@ -21,7 +21,7 @@ export function LogsPage() {
   const autoScroll = useRef(true)
 
   const { data, isLoading } = useLogs({ level: level || undefined, search: search || undefined })
-  const logs = Array.isArray(data) ? data : data?.data ?? []
+  const logs = Array.isArray(data) ? data : data?.logs ?? []
 
   useEffect(() => {
     if (autoScroll.current && bottomRef.current) {

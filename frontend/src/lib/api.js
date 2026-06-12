@@ -104,7 +104,7 @@ export const logsApi = {
     Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== 'undefined' && v !== '')
   ) : {}
   const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
-  return request(`/jobs${qs}`)
+  return request(`/logs${qs}`)
 },
   get(id) {
     return request(`/logs/${id}`)
