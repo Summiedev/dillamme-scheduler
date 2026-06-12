@@ -90,6 +90,11 @@ export function useSSE() {
         { queryKey: ['jobs'], type: 'active' },
         (cache) => upsertJobInCache(cache, normalized),
       )
+
+      queryClient.invalidateQueries({
+        queryKey: ['logs'],
+        refetchType: 'active',
+      })
     })
 
     const unsubJobDeleted = sseManager.subscribe('job_deleted', 'job_deleted', (data) => {

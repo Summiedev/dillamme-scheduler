@@ -5,6 +5,8 @@ export function useLogs(params) {
   return useQuery({
     queryKey: ['logs', params],
     queryFn: () => logsApi.list(params),
+    refetchInterval: 3000,
+    staleTime: 0,
   })
 }
 
