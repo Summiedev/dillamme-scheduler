@@ -79,25 +79,23 @@ Two independent OS processes managed by PM2. They never import each other. All c
 
 ## Tech Stack
 
-| Dependency | Version | Purpose |
-|---|---|---|
-| `fastapi` | ≥ 0.110 | Async web framework; handles routing, request validation, SSE streaming |
-| `uvicorn[standard]` | ≥ 0.29 | ASGI server; runs the FastAPI app |
-| `motor` | ≥ 3.3 | Async MongoDB driver; all DB operations are non-blocking |
-| `redis` | ≥ 5.0 | Async Redis client; pub/sub bridge between worker and API, NX locks |
-| `pydantic` | ≥ 2.6 | Request/response validation and data modelling |
-| `pydantic-settings` | ≥ 2.2 | Typed settings loaded from `.env` |
-| `structlog` | ≥ 24.1 | Structured JSON logging; every significant event is a structured log entry |
-| `python-dotenv` | ≥ 1.0 | `.env` file loading |
-| `aiofiles` | ≥ 23.2 | Async file I/O used by log handler |
-| `python-multipart` | ≥ 0.0.9 | Multipart form parsing (FastAPI dependency) |
-| React + Vite | — | Frontend SPA; dashboard, jobs table, create form, DLQ view |
-| TailwindCSS | — | Utility-first CSS |
-| TanStack Query | — | Server-state management; cache invalidation on SSE events |
-| PM2 | — | Process manager; keeps API and worker alive, restarts on crash |
-| Nginx | — | Reverse proxy; TLS termination, SSE buffering disabled for `/api/events` |
-| MongoDB | — | Primary persistence; compound indexes serve as the database-layer priority queue |
-| Redis | — | In-memory pub/sub and distributed locking |
+* `fastapi` ≥ 0.110
+* `uvicorn[standard]` ≥ 0.29
+* `motor` ≥ 3.3
+* `redis` ≥ 5.0
+* `pydantic` ≥ 2.6
+* `pydantic-settings` ≥ 2.2
+* `structlog` ≥ 24.1
+* `python-dotenv` ≥ 1.0
+* `aiofiles` ≥ 23.2
+* `python-multipart` ≥ 0.0.9
+* React + Vite
+* TailwindCSS
+* TanStack Query
+* PM2
+* Nginx
+* MongoDB
+* Redis
 
 ---
 
@@ -454,23 +452,6 @@ Without `proxy_buffering off`, Nginx buffers the response and the browser never 
 
 All variables are read from `backend/.env`. Copy `backend/.env.example` to `backend/.env` and fill in the values.
 
-| Variable | Default | Description |
-|---|---|---|
-| `MONGODB_URL` | `mongodb://localhost:27017` | MongoDB connection string |
-| `MONGODB_DB_NAME` | `dillame_scheduler` | MongoDB database name |
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection string |
-| `API_PORT` | `8000` | Port Uvicorn listens on |
-| `WORKER_ID` | `worker-01` | Unique identifier for this worker instance. Use distinct values when running multiple workers |
-| `LOG_LEVEL` | `INFO` | Structlog log level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
-| `ENVIRONMENT` | `development` | Runtime environment: `development`, `production`, `test` |
-| `WORKER_POLL_INTERVAL` | `2` | Seconds between worker loop iterations |
-| `STARVATION_CHECK_INTERVAL` | `60` | Seconds between starvation scans |
-| `STARVATION_AGE_THRESHOLD` | `300` | Seconds a job must be pending before it is eligible for a starvation boost |
-| `REDIS_LOCK_TTL` | `30` | Initial TTL in seconds for Redis NX job locks |
-| `LOCK_EXTEND_THRESHOLD` | `20` | Seconds of processing time before the lock TTL is extended |
-| `LOCK_EXTEND_BY` | `30` | Seconds added to the lock TTL on each extension |
-| `DLQ_THRESHOLD` | `10` | DLQ size that triggers the alert email |
-| `ALLOWED_ORIGINS` | `["*"]` | JSON array of allowed CORS origins. Set to your frontend URL in production |
 
 ---
 
@@ -483,7 +464,12 @@ All variables are read from `backend/.env`. Copy `backend/.env.example` to `back
 **Swagger UI:** [https://dillema.duckdns.org/docs](https://dillema.duckdns.org/docs)
 
 No authentication is required. No API keys or headers are needed beyond `Content-Type: application/json` for POST requests.
-
+MONGODB_URL=
+MONGODB_DB_NAME=dillame_scheduler
+REDIS_URL=
+WORKER_ID=worker-01
+ENVIRONMENT=production
+ALLOWED_ORIGINS=["[https://dilamme.duckdns.org](https://dillema.duckdns.org)"]
 ---
 
 ### UI Walkthrough
