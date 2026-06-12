@@ -21,7 +21,13 @@ export function LogsPage() {
   const autoScroll = useRef(true)
 
   const { data, isLoading } = useLogs({ level: level || undefined, search: search || undefined })
-  const logs = Array.isArray(data) ? data : data?.logs ?? []
+  const rawLogs = Array.isArray(data) ? data : data?.logs ?? []
+  const logs = rawLogs.map((log) => ({
+    ...log,
+    level: log.level || log.event,
+    jobId: log.jobId || log.job_id,
+    createdAt: log.createdAt || log.timestamp,
+  }))
 
   useEffect(() => {
     if (autoScroll.current && bottomRef.current) {
