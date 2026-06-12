@@ -21,10 +21,10 @@ export function StatCard({ title, value, subtitle, icon, trend, variant = 'defau
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <p className="text-2xs font-semibold uppercase tracking-wider text-text-muted">{title}</p>
+            <p className="text-sm font-semibold uppercase tracking-wider text-text-muted">{title}</p>
             {pulsing && <PulseIndicator variant="accent" size="sm" />}
           </div>
-          <p className="mt-1 text-lg font-bold text-text font-mono tracking-tight">{value ?? '-'}</p>
+          <p className="mt-1 text-3xl font-bold text-text font-mono tracking-tight">{value ?? '-'}</p>
           {subtitle && (
             <p className="mt-0.5 text-2xs text-text-secondary">{subtitle}</p>
           )}

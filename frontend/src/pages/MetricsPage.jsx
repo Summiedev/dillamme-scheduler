@@ -1,129 +1,348 @@
-import { useMetrics, useMetricsHistory } from '../hooks/useMetrics'
-import { StatCard } from '../components/dashboard/StatCard'
+import { useEffect, useMemo, useState } from 'react'
+import { PageShell } from '../components/layout/PageShell'
 import { Card, CardHeader, CardTitle } from '../components/ui/Card'
-import { PageSpinner } from '../components/ui/Spinner'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { Badge } from '../components/ui/Badge'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { Spinner } from '../components/ui/Spinner'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { timeAgo } from '../lib/utils'
+import { STATUS } from '../constants/status'
 
-const ICONS = {
-  total: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-  running: 'M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z',
-  success: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
-  failed: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z',
-  duration: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+const METRICS_URL = '/api/metrics'
+const HEALTH_URL = '/api/health'
+const LOGS_URL = '/api/logs?limit=20&offset=0'
+
+const STATUS_ORDER = [
+  STATUS.PENDING,
+  STATUS.PROCESSING,
+  STATUS.COMPLETED,
+  STATUS.FAILED,
+  STATUS.CANCELLED,
+]
+
+const PIE_COLORS = {
+  [STATUS.PENDING]: '#8b949e',
+  [STATUS.PROCESSING]: '#58a6ff',
+  [STATUS.COMPLETED]: '#3fb950',
+  [STATUS.FAILED]: '#f85149',
+  [STATUS.CANCELLED]: '#d29922',
+}
+
+const EVENT_VARIANTS = {
+  job_created: 'accent',
+  job_updated: 'success',
+  job_deleted: 'danger',
+  job_cancelled: 'warning',
+  job_failed: 'danger',
+  job_completed: 'success',
+  default: 'neutral',
+}
+
+function toNumber(value) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`)
+  }
+  return response.json()
+}
+
+function HealthPill({ label, value, tone }) {
+  const variant = tone === 'ok' ? 'success' : tone === 'stale' || tone === 'degraded' || tone === 'unknown' ? 'warning' : tone === 'error' ? 'danger' : 'neutral'
+  return (
+    <Badge variant={variant} size="lg" className="capitalize">
+      {label}: {value}
+    </Badge>
+  )
+}
+
+function LogEventBadge({ event }) {
+  const variant = EVENT_VARIANTS[event] || EVENT_VARIANTS.default
+  return (
+    <Badge variant={variant} size="sm" className="capitalize">
+      {event || 'log'}
+    </Badge>
+  )
 }
 
 export function MetricsPage() {
-  const { data: metrics, isLoading } = useMetrics()
-  const { data: history, isLoading: historyLoading } = useMetricsHistory()
+  const [metrics, setMetrics] = useState(null)
+  const [health, setHealth] = useState(null)
+  const [logs, setLogs] = useState([])
+  const [metricsError, setMetricsError] = useState(false)
+  const [healthError, setHealthError] = useState(false)
+  const [logsError, setLogsError] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
 
-  if (isLoading) return <PageSpinner />
+  useEffect(() => {
+    let cancelled = false
 
-  const m = metrics?.data || metrics || {}
-  const historyData = Array.isArray(history) ? history : history?.data ?? []
-  const lineData = historyData.length > 0
-    ? historyData
-    : [
-        { timestamp: '00:00', value: 95 },
-        { timestamp: '04:00', value: 96 },
-        { timestamp: '08:00', value: 98 },
-        { timestamp: '12:00', value: 99 },
-        { timestamp: '16:00', value: 97 },
-        { timestamp: '20:00', value: 98 },
-      ]
+    const loadMetricsAndHealth = async (silent = false) => {
+      if (!silent) {
+        setMetricsError(false)
+        setHealthError(false)
+      }
+
+      const [metricsResult, healthResult] = await Promise.allSettled([
+        fetchJson(METRICS_URL),
+        fetchJson(HEALTH_URL),
+      ])
+
+      if (cancelled) return
+
+      if (metricsResult.status === 'fulfilled') {
+        setMetrics(metricsResult.value)
+        setMetricsError(false)
+      } else {
+        setMetricsError(true)
+      }
+
+      if (healthResult.status === 'fulfilled') {
+        setHealth(healthResult.value)
+        setHealthError(false)
+      } else {
+        setHealthError(true)
+      }
+    }
+
+    const loadLogs = async (silent = false) => {
+      if (!silent) {
+        setLogsError(false)
+      }
+
+      try {
+        const data = await fetchJson(LOGS_URL)
+        if (cancelled) return
+        setLogs(Array.isArray(data.logs) ? data.logs : [])
+        setLogsError(false)
+      } catch {
+        if (!cancelled) {
+          setLogsError(true)
+        }
+      }
+    }
+
+    const loadInitial = async () => {
+      await Promise.allSettled([
+        loadMetricsAndHealth(false),
+        loadLogs(false),
+      ])
+      if (!cancelled) {
+        setInitialLoading(false)
+      }
+    }
+
+    loadInitial()
+
+    const metricsTimer = window.setInterval(() => {
+      loadMetricsAndHealth(true)
+    }, 15000)
+
+    const logsTimer = window.setInterval(() => {
+      loadLogs(true)
+    }, 10000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(metricsTimer)
+      window.clearInterval(logsTimer)
+    }
+  }, [])
+
+  const metricsData = metrics || {}
+  const byStatus = metricsData.by_status || {}
+  const totalJobs = toNumber(metricsData.total_jobs)
+  const dlqSize = toNumber(metricsData.dlq_size)
+
+  const statusRows = useMemo(() => {
+    return STATUS_ORDER.map((status) => ({
+      status,
+      value: toNumber(byStatus[status]),
+    }))
+  }, [byStatus])
+
+  const chartTotal = statusRows.reduce((sum, item) => sum + item.value, 0)
+  const chartData = statusRows
+
+  const healthRow = [
+    {
+      label: 'MongoDB',
+      value: healthError ? 'unavailable' : health?.mongodb || 'unavailable',
+      tone: healthError ? 'error' : health?.mongodb || 'error',
+    },
+    {
+      label: 'Redis',
+      value: healthError ? 'unavailable' : health?.redis || 'unavailable',
+      tone: healthError ? 'error' : health?.redis || 'error',
+    },
+    {
+      label: 'Worker',
+      value: healthError ? 'unavailable' : health?.worker || 'unavailable',
+      tone: healthError ? 'error' : health?.worker || 'error',
+    },
+  ]
+
+  if (initialLoading) {
+    return (
+      <PageShell title="System Health" description="MongoDB, Redis, worker, and logs">
+        <div className="flex items-center justify-center py-16">
+          <div className="flex flex-col items-center gap-3">
+            <Spinner size="xl" />
+            <span className="text-xs text-text-muted font-mono">loading</span>
+          </div>
+        </div>
+      </PageShell>
+    )
+  }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-text">Metrics</h2>
-        <p className="mt-1 text-sm text-text-secondary">System performance and job statistics</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-        <StatCard
-          title="Total Jobs"
-          value={m.totalJobs ?? m.total ?? '-'}
-          icon={ICONS.total}
-        />
-        <StatCard
-          title="Running"
-          value={m.runningJobs ?? m.running ?? 0}
-          variant="warning"
-          icon={ICONS.running}
-        />
-        <StatCard
-          title="Success Rate"
-          value={m.successRate != null ? `${m.successRate}%` : '-'}
-          variant="success"
-          icon={ICONS.success}
-        />
-        <StatCard
-          title="Failed"
-          value={m.failedJobs ?? m.failed ?? 0}
-          variant="danger"
-          icon={ICONS.failed}
-        />
-        <StatCard
-          title="Avg Duration"
-          value={m.avgDuration != null ? `${m.avgDuration}ms` : '-'}
-          icon={ICONS.duration}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <PageShell title="System Health" description="MongoDB, Redis, worker, and logs">
+      <div className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle>Jobs Over Time</CardTitle>
+            <CardTitle>Health Status</CardTitle>
           </CardHeader>
-          <div className="h-64">
-            {historyLoading ? <PageSpinner /> : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={lineData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
-                  <XAxis dataKey="timestamp" tick={{ fontSize: 10, fill: '#8b949e' }} stroke="#30363d" />
-                  <YAxis tick={{ fontSize: 10, fill: '#8b949e' }} stroke="#30363d" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1c2128',
-                      border: '1px solid #30363d',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      color: '#e6edf3',
-                    }}
-                  />
-                  <Bar dataKey="value" fill="#58a6ff" radius={[2, 2, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+          <div className="flex flex-wrap gap-2">
+            {healthRow.map((item) => (
+              <HealthPill
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                tone={item.tone}
+              />
+            ))}
           </div>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Success Rate Trend</CardTitle>
-          </CardHeader>
-          <div className="h-64">
-            {historyLoading ? <PageSpinner /> : (
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={lineData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
-                  <XAxis dataKey="timestamp" tick={{ fontSize: 10, fill: '#8b949e' }} stroke="#30363d" />
-                  <YAxis tick={{ fontSize: 10, fill: '#8b949e' }} stroke="#30363d" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1c2128',
-                      border: '1px solid #30363d',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      color: '#e6edf3',
-                    }}
-                  />
-                  <Line type="monotone" dataKey="value" stroke="#3fb950" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Card>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Total Jobs</CardTitle>
+            </CardHeader>
+            <div className="text-3xl font-bold text-text font-mono">
+              {metricsError ? 'unavailable' : totalJobs}
+            </div>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Completed</CardTitle>
+            </CardHeader>
+            <div className="text-3xl font-bold text-text font-mono">
+              {metricsError ? 'unavailable' : toNumber(byStatus[STATUS.COMPLETED])}
+            </div>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Failed</CardTitle>
+            </CardHeader>
+            <div className="text-3xl font-bold text-text font-mono">
+              {metricsError ? 'unavailable' : toNumber(byStatus[STATUS.FAILED])}
+            </div>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>DLQ Size</CardTitle>
+            </CardHeader>
+            <div className="text-3xl font-bold text-text font-mono">
+              {metricsError ? 'unavailable' : dlqSize}
+            </div>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Job Status Breakdown</CardTitle>
+            </CardHeader>
+            <div className="relative h-72">
+              {metricsError ? (
+                <div className="flex h-full items-center justify-center text-sm text-text-muted">
+                  unavailable
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData}
+                        dataKey="value"
+                        nameKey="status"
+                        innerRadius={78}
+                        outerRadius={110}
+                        paddingAngle={2}
+                        stroke="none"
+                      >
+                        {chartData.map((entry) => (
+                          <Cell key={entry.status} fill={PIE_COLORS[entry.status]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1c2128',
+                          border: '1px solid #30363d',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          color: '#e6edf3',
+                        }}
+                        formatter={(value, name) => [value, name]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-3xl font-bold font-mono text-text">
+                        {chartTotal}
+                      </div>
+                      <div className="text-xs text-text-muted">total jobs</div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {statusRows.map((item) => (
+                <div key={item.status} className="flex items-center gap-2">
+                  <StatusBadge status={item.status} />
+                  <span className="text-xs text-text-muted font-mono">{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Logs</CardTitle>
+            </CardHeader>
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
+              {logsError ? (
+                <div className="flex items-center justify-center py-10 text-sm text-text-muted">
+                  unavailable
+                </div>
+              ) : logs.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-sm text-text-muted">
+                  No recent logs
+                </div>
+              ) : (
+                logs.map((log, idx) => (
+                  <div key={log.id || log._id || idx} className="flex items-start gap-3 rounded-md border border-border bg-surface-100/40 px-3 py-2">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-muted font-mono">{timeAgo(log.timestamp || log.createdAt)}</span>
+                        <LogEventBadge event={log.event} />
+                      </div>
+                      <p className="text-sm text-text">{log.message || log.text || JSON.stringify(log)}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

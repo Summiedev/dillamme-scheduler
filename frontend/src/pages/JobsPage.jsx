@@ -121,23 +121,23 @@ export function JobsPage() {
                       <Td>
                         <span className="text-sm font-mono text-text">{job.id?.slice(0, 12)}</span>
                       </Td>
-                      <Td className="text-xs text-text-secondary">{job.type || '-'}</Td>
+                      <Td className="text-sm text-text-secondary">{job.type || '-'}</Td>
                       <Td><StatusBadge status={job.status} /></Td>
                       <Td className="hidden md:table-cell">
                         {priorityLabel && (
-                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-mono font-medium ${priorityColor?.bg || 'bg-surface-200'} ${priorityColor?.text || 'text-text-muted'} border ${priorityColor?.border || 'border-surface-300'}`}>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-sm font-mono font-medium ${priorityColor?.bg || 'bg-surface-200'} ${priorityColor?.text || 'text-text-muted'} border ${priorityColor?.border || 'border-surface-300'}`}>
                             {priorityLabel}
                           </span>
                         )}
                       </Td>
-                      <Td className="hidden sm:table-cell text-xs text-text-muted font-mono">{job.retryCount ?? 0}/{job.maxRetries ?? '-'}</Td>
-                      <Td className="hidden lg:table-cell text-xs text-text-muted font-mono" title={formatDate(job.scheduledAt)}>
+                      <Td className="hidden sm:table-cell text-sm text-text-muted font-mono">{job.retryCount ?? 0}/{job.maxRetries ?? '-'}</Td>
+                      <Td className="hidden lg:table-cell text-sm text-text-muted font-mono" title={formatDate(job.scheduledAt)}>
                         {job.scheduledAt ? timeAgo(job.scheduledAt) : '-'}
                       </Td>
-                      <Td className="hidden lg:table-cell text-xs text-text-muted font-mono">
+                      <Td className="hidden lg:table-cell text-sm text-text-muted font-mono">
                         {job.interval || '-'}
                       </Td>
-                      <Td className="hidden sm:table-cell text-xs text-text-muted font-mono" title={formatDate(job.createdAt)}>
+                      <Td className="hidden sm:table-cell text-sm text-text-muted font-mono" title={formatDate(job.createdAt)}>
                         {timeAgo(job.createdAt)}
                       </Td>
                       <Td>

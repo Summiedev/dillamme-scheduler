@@ -20,7 +20,7 @@ export function Sidebar({ onClose }) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
         </div>
-        <span className="text-sm font-bold text-text tracking-tight">Dilamme</span>
+        <span className="text-base font-semibold text-text tracking-tight">Dilamme</span>
         <span className="ml-auto text-2xs text-text-muted font-mono">v1.0.0</span>
       </div>
 
@@ -32,7 +32,7 @@ export function Sidebar({ onClose }) {
             end={item.path === '/'}
             onClick={onClose}
             className={({ isActive }) =>
-              `flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all duration-150 ${
+              `flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all duration-150 ${
                 isActive
                   ? 'bg-accent-subtle/20 text-accent shadow-sm'
                   : 'text-text-secondary hover:text-text hover:bg-surface-100'

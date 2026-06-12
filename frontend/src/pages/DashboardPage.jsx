@@ -115,7 +115,7 @@ export function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Live Activity</CardTitle>
+              <CardTitle className="text-sm font-semibold">Live Activity</CardTitle>
             <PulseIndicator variant="success" size="sm" pulsing={connected} />
           </CardHeader>
           <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -126,8 +126,8 @@ export function DashboardPage() {
                 <div key={alert.id || idx} className="flex items-start gap-2 px-2 py-1.5 rounded bg-surface-100/50">
                   <PulseIndicator variant="danger" size="sm" pulsing={false} />
                   <div className="min-w-0">
-                    <p className="text-xs text-text truncate">{alert.message || 'DLQ alert'}</p>
-                    <p className="text-2xs text-text-muted font-mono">{alert.timestamp || alert.createdAt}</p>
+                    <p className="text-sm text-text truncate">{alert.message || 'DLQ alert'}</p>
+                    <p className="text-xs text-text-muted font-mono">{alert.timestamp || alert.createdAt}</p>
                   </div>
                 </div>
               ))
