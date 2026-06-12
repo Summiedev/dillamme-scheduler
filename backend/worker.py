@@ -17,7 +17,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 import structlog
-
+import smtplib
 from pymongo import UpdateOne
 from config import settings
 from core.backoff import calculate_backoff
@@ -28,6 +28,7 @@ from db.indexes import ensure_indexes
 from handlers import get_handler
 from models.job import INTERVAL_SECONDS, JobInterval
 
+from email.mime.text import MIMEText
 logger = structlog.get_logger()
 
 # ── Shared state ──────────────────────────────────────────────────────────
@@ -280,8 +281,26 @@ async def check_dlq_threshold(db):
 
 
 async def send_dlq_alert_email(payload: dict):
-    """Mock DLQ alert email sender used by the alert path."""
-    logger.info("dlq_alert_email_sent", payload=payload)
+    
+
+    msg = MIMEText(
+        f"DLQ threshold exceeded.\n\n"
+        f"Count: {payload['count']}\n"
+        f"Threshold: {payload['threshold']}\n"
+        f"Worker: {payload['worker_id']}\n"
+        f"Time: {payload['observed_at']}"
+    )
+    msg["Subject"] = f"[Dilamme] DLQ Alert: {payload['count']} failed jobs"
+    msg["From"] = settings.alert_email
+    msg["To"] = settings.alert_recipient
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(settings.alert_email, settings.alert_email_password)
+            server.send_message(msg)
+        logger.info("dlq_alert_email_sent", count=payload["count"])
+    except Exception as exc:
+        logger.error("dlq_alert_email_failed", error=str(exc))
 
 
 def _build_recurring_job(job: dict, now: datetime) -> tuple[dict, datetime] | tuple[None, None]:
