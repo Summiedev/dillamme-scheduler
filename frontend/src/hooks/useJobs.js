@@ -7,18 +7,20 @@ export function useJobs(params) {
   return useQuery({
     queryKey: [...JOBS_KEY, params],
     queryFn: async () => {
-  const res = await jobsApi.list(params)
-  const jobs = (res.jobs || []).map(j => ({
-    ...j,
-    id: j.job_id,
-    retryCount: j.retry_count,
-    maxRetries: j.max_retries,
-    scheduledAt: j.scheduled_at,
-    createdAt: j.created_at,
-  }))
-  return { ...res, jobs, data: jobs }
-},
+      const res = await jobsApi.list(params)
+      const jobs = (res.jobs || []).map(j => ({
+        ...j,
+        id: j.job_id,
+        retryCount: j.retry_count,
+        maxRetries: j.max_retries,
+        scheduledAt: j.scheduled_at,
+        createdAt: j.created_at,
+      }))
+      return { ...res, jobs, data: jobs }
+    },
+    refetchInterval: 3000,
     placeholderData: (prev) => prev,
+    staleTime: 0,
   })
 }
 
@@ -38,7 +40,9 @@ export function useJob(id) {
       }
     },
     enabled: !!id,
+    refetchInterval: 3000,
     placeholderData: (prev) => prev,
+    staleTime: 0,
   })
 }
 

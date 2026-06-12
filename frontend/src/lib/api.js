@@ -82,7 +82,7 @@ export const dlqApi = {
     Object.entries(params).filter(([_, v]) => v !== undefined && v !== null && v !== 'undefined' && v !== '')
   ) : {}
   const qs = Object.keys(filtered).length ? '?' + new URLSearchParams(filtered).toString() : ''
-  return request(`/jobs${qs}`)
+  return request(`/dlq${qs}`)
 },
   get(id) {
     return request(`/dlq/${id}`)
