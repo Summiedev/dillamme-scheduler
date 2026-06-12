@@ -25,7 +25,18 @@ export function useJobs(params) {
 export function useJob(id) {
   return useQuery({
     queryKey: [...JOBS_KEY, id],
-    queryFn: () => jobsApi.get(id),
+    queryFn: async () => {
+      const res = await jobsApi.get(id)
+      return {
+        ...res,
+        id: res.job_id,
+        retryCount: res.retry_count,
+        maxRetries: res.max_retries,
+        scheduledAt: res.scheduled_at,
+        createdAt: res.created_at,
+        updatedAt: res.updated_at,
+      }
+    },
     enabled: !!id,
     placeholderData: (prev) => prev,
   })

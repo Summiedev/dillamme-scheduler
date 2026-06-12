@@ -8,7 +8,7 @@ import { Badge } from '../components/ui/Badge'
 import { PRIORITY, PRIORITY_LABELS } from '../constants/priority'
 import toast from 'react-hot-toast'
 
-const JOB_TYPES = ['send_email', 'webhook', 'log_processing']
+const JOB_TYPES = ['send_email', 'webhook', 'log_processing', 'generate_report', 'upload_file']
 
 const TYPE_EXAMPLES = {
   send_email: {
@@ -31,6 +31,21 @@ const TYPE_EXAMPLES = {
     metadata: {
       user_id: 'u_12345',
       ip: '192.168.1.1',
+    },
+  },
+  generate_report: {
+    report_type: 'sales',
+    format: 'pdf',
+    filters: {
+      date_from: '2026-06-01',
+      date_to: '2026-06-12',
+    },
+  },
+  upload_file: {
+    file_name: 'monthly_report.pdf',
+    destination: 'https://storage.example.com/reports/',
+    metadata: {
+      source: 'scheduler',
     },
   },
 }
@@ -430,6 +445,8 @@ export function CreateJobPage({ open = false, onClose = () => {} }) {
                     <option value="send_email">send_email</option>
                     <option value="webhook">webhook</option>
                     <option value="log_processing">log_processing</option>
+                    <option value="generate_report">generate_report</option>
+                    <option value="upload_file">upload_file</option>
                   </select>
                   {errors.type && <p className="text-sm text-danger font-mono">{errors.type}</p>}
                 </div>
