@@ -454,23 +454,6 @@ Without `proxy_buffering off`, Nginx buffers the response and the browser never 
 
 All variables are read from `backend/.env`. Copy `backend/.env.example` to `backend/.env` and fill in the values.
 
-| Variable | Default | Description |
-|---|---|---|
-| `MONGODB_URL` | `mongodb://localhost:27017` | MongoDB connection string |
-| `MONGODB_DB_NAME` | `dillame_scheduler` | MongoDB database name |
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis connection string |
-| `API_PORT` | `8000` | Port Uvicorn listens on |
-| `WORKER_ID` | `worker-01` | Unique identifier for this worker instance. Use distinct values when running multiple workers |
-| `LOG_LEVEL` | `INFO` | Structlog log level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` |
-| `ENVIRONMENT` | `development` | Runtime environment: `development`, `production`, `test` |
-| `WORKER_POLL_INTERVAL` | `2` | Seconds between worker loop iterations |
-| `STARVATION_CHECK_INTERVAL` | `60` | Seconds between starvation scans |
-| `STARVATION_AGE_THRESHOLD` | `300` | Seconds a job must be pending before it is eligible for a starvation boost |
-| `REDIS_LOCK_TTL` | `30` | Initial TTL in seconds for Redis NX job locks |
-| `LOCK_EXTEND_THRESHOLD` | `20` | Seconds of processing time before the lock TTL is extended |
-| `LOCK_EXTEND_BY` | `30` | Seconds added to the lock TTL on each extension |
-| `DLQ_THRESHOLD` | `10` | DLQ size that triggers the alert email |
-| `ALLOWED_ORIGINS` | `["*"]` | JSON array of allowed CORS origins. Set to your frontend URL in production |
 
 ---
 
@@ -483,7 +466,12 @@ All variables are read from `backend/.env`. Copy `backend/.env.example` to `back
 **Swagger UI:** [https://dillema.duckdns.org/docs](https://dillema.duckdns.org/docs)
 
 No authentication is required. No API keys or headers are needed beyond `Content-Type: application/json` for POST requests.
-
+MONGODB_URL=
+MONGODB_DB_NAME=dillame_scheduler
+REDIS_URL=
+WORKER_ID=worker-01
+ENVIRONMENT=production
+ALLOWED_ORIGINS=["[https://dilamme.duckdns.org](https://dillema.duckdns.org)"]
 ---
 
 ### UI Walkthrough
