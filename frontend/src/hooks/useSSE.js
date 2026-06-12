@@ -15,6 +15,41 @@ function normalizeJob(job) {
   }
 }
 
+function upsertJobInCache(cache, job) {
+  if (!cache) return cache
+
+  const id = job.id
+  const upsertIntoArray = (items = []) => {
+    const index = items.findIndex((item) => (item?.id || item?.job_id) === id)
+    if (index === -1) {
+      return [...items, job]
+    }
+    const next = [...items]
+    next[index] = { ...next[index], ...job }
+    return next
+  }
+
+  if (Array.isArray(cache)) {
+    return upsertIntoArray(cache)
+  }
+
+  if (Array.isArray(cache.jobs) || Array.isArray(cache.data)) {
+    const nextJobs = Array.isArray(cache.jobs) ? upsertIntoArray(cache.jobs) : cache.jobs
+    const nextData = Array.isArray(cache.data) ? upsertIntoArray(cache.data) : cache.data
+    return {
+      ...cache,
+      ...(Array.isArray(cache.jobs) ? { jobs: nextJobs } : null),
+      ...(Array.isArray(cache.data) ? { data: nextData } : null),
+    }
+  }
+
+  if ((cache.id || cache.job_id) === id) {
+    return { ...cache, ...job }
+  }
+
+  return cache
+}
+
 export function useSSE() {
   const queryClient = useQueryClient()
   const cleanupRef = useRef(null)
@@ -36,6 +71,7 @@ export function useSSE() {
       if (id) {
         const normalized = normalizeJob(job)
         upsertJob(normalized)
+        queryClient.setQueriesData({ queryKey: ['jobs'] }, (cache) => upsertJobInCache(cache, normalized))
         queryClient.setQueryData(['jobs', id], normalized)
         queryClient.invalidateQueries({ queryKey: ['jobs'], refetchType: 'active' })
         queryClient.invalidateQueries({ queryKey: ['metrics'], refetchType: 'active' })
