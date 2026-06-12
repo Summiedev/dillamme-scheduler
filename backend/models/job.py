@@ -69,6 +69,8 @@ class JobDocument(BaseModel):
     tags: list[str] = []
     error: Optional[str] = None
     cancel_requested: bool = False
+    deferred_until: Optional[datetime] = None
+    last_heartbeat: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     next_run_at: Optional[datetime] = None

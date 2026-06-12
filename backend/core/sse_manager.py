@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from asyncio import QueueFull
 import json
+from dataclasses import dataclass, field
 import structlog
 from config import settings
 from db.connection import get_redis
@@ -12,6 +13,12 @@ from db.connection import get_redis
 logger = structlog.get_logger()
 
 SSE_CHANNEL = "job_events"
+
+
+@dataclass
+class SSEClient:
+    queue: asyncio.Queue[str] = field(default_factory=lambda: asyncio.Queue(maxsize=256))
+    close_event: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 class SSEManager:
@@ -23,7 +30,7 @@ class SSEManager:
     """
 
     def __init__(self):
-        self.clients: list[asyncio.Queue] = []
+        self.clients: list[SSEClient] = []
         self._subscriber_task: asyncio.Task | None = None
 
     async def start(self):
@@ -47,44 +54,45 @@ class SSEManager:
             async for message in pubsub.listen():
                 if message["type"] == "message":
                     data = message["data"]
-                    dead: list[asyncio.Queue] = []
-                    for queue in self.clients:
+                    dead: list[SSEClient] = []
+                    for client in list(self.clients):
                         try:
-                            queue.put_nowait(data)
+                            client.queue.put_nowait(data)
                         except QueueFull:
-                            dead.append(queue)
-                    for q in dead:
-                        await self.disconnect(q)
+                            dead.append(client)
+                    for client in dead:
+                        await self.disconnect(client)
         except asyncio.CancelledError:
             await pubsub.unsubscribe(SSE_CHANNEL)
             raise
 
-    async def connect(self) -> asyncio.Queue:
-        """Register a new SSE client. Returns a Queue the client reads from."""
-        queue: asyncio.Queue = asyncio.Queue(maxsize=256)
-        self.clients.append(queue)
+    async def connect(self) -> SSEClient:
+        """Register a new SSE client. Returns a client handle the stream reads from."""
+        client = SSEClient()
+        self.clients.append(client)
         logger.info("sse_client_connected", total_clients=len(self.clients))
-        return queue
+        return client
 
-    async def disconnect(self, queue: asyncio.Queue):
+    async def disconnect(self, client: SSEClient):
         """Remove an SSE client."""
         try:
-            self.clients.remove(queue)
+            self.clients.remove(client)
         except ValueError:
             pass
+        client.close_event.set()
         logger.info("sse_client_disconnected", total_clients=len(self.clients))
 
     # ── Used by the API process (FastAPI broadcasts to SSE clients directly) ──
     async def broadcast(self, event: str, data: dict):
         message = f"event: {event}\ndata: {json.dumps(data)}\n\n"
-        dead: list[asyncio.Queue] = []
-        for queue in self.clients:
+        dead: list[SSEClient] = []
+        for client in list(self.clients):
             try:
-                queue.put_nowait(message)
+                client.queue.put_nowait(message)
             except QueueFull:
-                dead.append(queue)
-        for q in dead:
-            await self.disconnect(q)
+                dead.append(client)
+        for client in dead:
+            await self.disconnect(client)
         logger.info("sse_event_broadcast", event=event)
 
     # ── Used by the worker process (publishes to Redis) ──

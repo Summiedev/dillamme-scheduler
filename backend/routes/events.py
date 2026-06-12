@@ -33,13 +33,33 @@ async def event_stream():
     """
 
     async def generate():
-        queue = await sse_manager.connect()
+        client = await sse_manager.connect()
         try:
             # Send initial keepalive
             yield f"event: connected\ndata: {json.dumps({'status': 'connected'})}\n\n"
             while True:
                 try:
-                    message = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    message_task = asyncio.create_task(client.queue.get())
+                    close_task = asyncio.create_task(client.close_event.wait())
+                    done, pending = await asyncio.wait(
+                        {message_task, close_task},
+                        timeout=30.0,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    if not done:
+                        for task in pending:
+                            task.cancel()
+                        await asyncio.gather(*pending, return_exceptions=True)
+                        yield ": keepalive\n\n"
+                        continue
+                    if close_task in done and client.close_event.is_set():
+                        if not message_task.done():
+                            message_task.cancel()
+                        await asyncio.gather(message_task, close_task, return_exceptions=True)
+                        break
+                    message = message_task.result()
+                    close_task.cancel()
+                    await asyncio.gather(close_task, return_exceptions=True)
                     yield message
                 except asyncio.TimeoutError:
                     # Send keepalive comment to prevent connection timeout
@@ -47,7 +67,7 @@ async def event_stream():
         except asyncio.CancelledError:
             pass
         finally:
-            await sse_manager.disconnect(queue)
+            await sse_manager.disconnect(client)
 
     return StreamingResponse(
         generate(),

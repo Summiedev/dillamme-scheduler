@@ -13,6 +13,7 @@ import { CreateJobPage } from './CreateJobPage'
 import { formatDate, timeAgo } from '../lib/utils'
 import { STATUS } from '../constants/status'
 import { PRIORITY, PRIORITY_LABELS, PRIORITY_COLORS } from '../constants/priority'
+import { useJobStore } from '../store/jobStore'
 import toast from 'react-hot-toast'
 
 const STATUS_OPTIONS = [
@@ -37,7 +38,14 @@ export function JobsPage() {
     [page, search, statusFilter]
   )
   const { data, isLoading } = useJobs(params)
-  const jobs = Array.isArray(data) ? data : data?.data ?? []
+  const liveJobs = useJobStore((state) => state.jobs)
+  const jobs = useMemo(() => {
+    const baseJobs = Array.isArray(data) ? data : data?.data ?? data?.jobs ?? []
+    return baseJobs.map((job) => {
+      const liveJob = liveJobs[job.id]
+      return liveJob ? { ...job, ...liveJob } : job
+    })
+  }, [data, liveJobs])
   const total = data?.total ?? jobs.length
   const totalPages = data?.totalPages || Math.ceil(total / 20) || 1
 

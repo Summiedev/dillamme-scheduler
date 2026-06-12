@@ -26,17 +26,17 @@ async def _serialize(doc: dict) -> dict:
 async def list_dlq(limit: int = 50, offset: int = 0):
     db = await get_db()
     pipeline = [
-        {"$match": {}},
+        {"$match": {"status": "failed", "dlq.active": True}},
         {"$facet": {
             "data": [
-                {"$sort": {"failed_at": -1}},
+                {"$sort": {"dlq.failed_at": -1}},
                 {"$skip": offset},
                 {"$limit": limit},
             ],
             "total": [{"$count": "count"}],
         }},
     ]
-    result = await db.dlq.aggregate(pipeline).to_list(length=1)
+    result = await db.jobs.aggregate(pipeline).to_list(length=1)
     row = result[0] if result else {"data": [], "total": []}
     entries = [await _serialize(d) for d in row["data"]]
     total = row["total"][0]["count"] if row["total"] else 0
@@ -47,34 +47,41 @@ async def list_dlq(limit: int = 50, offset: int = 0):
 async def retry_dlq_entry(job_id: str):
     """Move a DLQ entry back to the jobs collection for retry."""
     db = await get_db()
-
-    dlq_doc = await db.dlq.find_one({"job_id": job_id})
-    if dlq_doc is None:
+    now = datetime.now(UTC)
+    current = await db.jobs.find_one({"job_id": job_id})
+    if current is None:
         raise HTTPException(status_code=404, detail="DLQ entry not found")
 
-    now = datetime.now(UTC)
-    new_job = {
-        "job_id": dlq_doc["job_id"],
-        "type": dlq_doc["type"],
-        "payload": dlq_doc.get("payload", {}),
-        "priority": dlq_doc.get("priority", 2),
-        "status": "pending",
-        "retry_count": 0,
-        "max_retries": 3,
-        "scheduled_at": now,
-        "interval": dlq_doc.get("interval"),
-        "dependencies": dlq_doc.get("dependencies", []),
-        "tags": dlq_doc.get("tags", []),
-        "error": None,
-        "cancel_requested": False,
-        "created_at": now,
-        "updated_at": now,
-        "next_run_at": now,
-        "effective_priority": float(dlq_doc.get("priority", 2)),
-    }
+    dlq_state = current.get("dlq") or {}
+    if current.get("status") == "pending" and not dlq_state.get("active"):
+        return {"job_id": job_id, "status": "pending", "message": "Re-queued from DLQ"}
+    if current.get("status") != "failed" or not dlq_state.get("active"):
+        raise HTTPException(status_code=409, detail="DLQ entry is no longer available")
 
-    await db.jobs.replace_one({"job_id": job_id}, new_job, upsert=True)
-    await db.dlq.delete_one({"job_id": job_id})
+    retry_update = await db.jobs.update_one(
+        {"job_id": job_id, "status": "failed", "dlq.active": True},
+        {
+            "$set": {
+                "status": "pending",
+                "retry_count": 0,
+                "scheduled_at": now,
+                "error": None,
+                "cancel_requested": False,
+                "deferred_until": None,
+                "last_heartbeat": None,
+                "updated_at": now,
+                "next_run_at": now,
+                "effective_priority": float(current.get("priority", 2)),
+            },
+            "$unset": {"dlq": ""},
+        },
+    )
+
+    if retry_update.matched_count == 0:
+        current = await db.jobs.find_one({"job_id": job_id})
+        if current is not None and current.get("status") == "pending" and not (current.get("dlq") or {}).get("active"):
+            return {"job_id": job_id, "status": "pending", "message": "Re-queued from DLQ"}
+        raise HTTPException(status_code=409, detail="DLQ entry is no longer available")
 
     logger.info("dlq_retry", job_id=job_id)
     await db.job_logs.insert_one({
@@ -84,6 +91,7 @@ async def retry_dlq_entry(job_id: str):
         "timestamp": now,
     })
 
-    await SSEManager.publish_worker_event("job_updated", new_job)
+    updated = await db.jobs.find_one({"job_id": job_id})
+    await SSEManager.publish_worker_event("job_updated", await _serialize(updated))
 
     return {"job_id": job_id, "status": "pending", "message": "Re-queued from DLQ"}

@@ -65,6 +65,10 @@ export function useSSE() {
       setSSEStatus(status)
     })
 
+    const unsubReconnect = sseManager.onReconnect(() => {
+      queryClient.refetchQueries({ type: 'active' })
+    })
+
     const unsubJobUpdated = sseManager.subscribe('job_updated', 'job_updated', (data) => {
       const job = data.job || data
       const id = job.job_id || job.id
@@ -97,6 +101,7 @@ export function useSSE() {
 
     cleanupRef.current = () => {
       unsubState()
+      unsubReconnect()
       unsubJobUpdated()
       unsubJobDeleted()
       unsubDlqThreshold()

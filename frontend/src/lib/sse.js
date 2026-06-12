@@ -1,6 +1,6 @@
 const SSE_URL = import.meta.env.VITE_SSE_URL || '/api'
-
-const MAX_RETRIES = 5
+const BASE_RETRY_DELAY_MS = 1000
+const MAX_RETRY_DELAY_MS = 30000
 
 function createSingletonSSE() {
   let eventSource = null
@@ -10,10 +10,12 @@ function createSingletonSSE() {
   let retryTimer = null
   let currentEndpoint = null
   let stateChangeCallback = null
+  let reconnectCallback = null
 
   function getDelay() {
-    const delays = [3000, 6000, 12000, 24000, 48000]
-    return delays[Math.min(retryCount, delays.length - 1)]
+    const exponential = Math.min(BASE_RETRY_DELAY_MS * (2 ** retryCount), MAX_RETRY_DELAY_MS)
+    const jitter = 0.5 + Math.random()
+    return Math.round(exponential * jitter)
   }
 
   function setState(state) {
@@ -36,8 +38,12 @@ function createSingletonSSE() {
       clearTimeout(retryTimer)
       retryTimer = null
     }
+    const wasRetrying = retryCount > 0
     retryCount = 0
     setState('connected')
+    if (wasRetrying && reconnectCallback) {
+      reconnectCallback()
+    }
   }
 
   function handleError() {
@@ -46,10 +52,6 @@ function createSingletonSSE() {
       eventSource = null
     }
     retryCount++
-    if (retryCount >= MAX_RETRIES) {
-      setState('error')
-      return
-    }
     setState('reconnecting')
     scheduleReconnect()
   }
@@ -113,6 +115,13 @@ function createSingletonSSE() {
     }
   }
 
+  function onReconnect(callback) {
+    reconnectCallback = callback
+    return () => {
+      reconnectCallback = null
+    }
+  }
+
   function getState() {
     return { state: connectionState, retryCount }
   }
@@ -122,6 +131,7 @@ function createSingletonSSE() {
     disconnect,
     subscribe,
     onStateChange,
+    onReconnect,
     getState,
   }
 }

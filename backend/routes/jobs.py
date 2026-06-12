@@ -21,16 +21,61 @@ async def _serialize(doc: dict) -> dict:
         return None
     doc["_id"] = str(doc["_id"])
     return doc
+
+
 def _json_serial(obj):
     if isinstance(obj, datetime):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")
+
+
+async def _validate_dependency_graph(db, dependency_ids: list[str]) -> None:
+    """Reject cyclic dependency graphs before creating a job."""
+    seen: set[str] = set()
+    visiting: set[str] = set()
+    path: list[str] = []
+    dependency_cache: dict[str, list[str]] = {}
+
+    async def load_dependencies(job_id: str) -> list[str]:
+        if job_id not in dependency_cache:
+            doc = await db.jobs.find_one({"job_id": job_id}, {"job_id": 1, "dependencies": 1})
+            dependency_cache[job_id] = list(doc.get("dependencies") or []) if doc else []
+        return dependency_cache[job_id]
+
+    async def visit(job_id: str) -> None:
+        if job_id in visiting:
+            cycle_start = path.index(job_id)
+            cycle_path = path[cycle_start:] + [job_id]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Circular dependency detected: {' -> '.join(cycle_path)}",
+            )
+        if job_id in seen:
+            return
+
+        visiting.add(job_id)
+        path.append(job_id)
+
+        for downstream_id in await load_dependencies(job_id):
+            await visit(downstream_id)
+
+        path.pop()
+        visiting.remove(job_id)
+        seen.add(job_id)
+
+    for dependency_id in dict.fromkeys(dependency_ids):
+        await visit(dependency_id)
+
 
 @router.post("/jobs", status_code=201)
 async def create_job(body: JobCreate):
     """Create a new job."""
     db = await get_db()
     now = datetime.now(UTC)
+
+    if body.dependencies:
+        await _validate_dependency_graph(db, body.dependencies)
+
     doc = {
         "job_id": str(uuid4()),
         "type": body.type,
@@ -45,6 +90,8 @@ async def create_job(body: JobCreate):
         "tags": body.tags,
         "error": None,
         "cancel_requested": False,
+        "deferred_until": None,
+        "last_heartbeat": None,
         "created_at": now,
         "updated_at": now,
         "next_run_at": body.scheduled_at or now,
@@ -175,12 +222,28 @@ async def retry_job(job_id: str):
     doc = await db.jobs.find_one({"job_id": job_id})
     if doc is None:
         raise HTTPException(status_code=404, detail="Job not found")
+    if doc["status"] == "pending" and not (doc.get("dlq") or {}).get("active"):
+        return await _serialize(doc)
     if doc["status"] != "failed":
         raise HTTPException(status_code=409, detail="Only failed jobs can be retried.")
     now = datetime.now(UTC)
     await db.jobs.update_one(
-        {"job_id": job_id},
-        {"$set": {"status": "pending", "retry_count": 0, "error": None, "updated_at": now}},
+        {"job_id": job_id, "status": "failed"},
+        {
+            "$set": {
+                "status": "pending",
+                "retry_count": 0,
+                "error": None,
+                "cancel_requested": False,
+                "deferred_until": None,
+                "last_heartbeat": None,
+                "updated_at": now,
+                "scheduled_at": now,
+                "next_run_at": now,
+                "effective_priority": float(doc.get("priority", 2)),
+            },
+            "$unset": {"dlq": ""},
+        },
     )
     updated = await db.jobs.find_one({"job_id": job_id})
     await db.job_logs.insert_one({

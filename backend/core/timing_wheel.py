@@ -34,9 +34,10 @@ class TimingWheel:
     def __init__(self):
         self.slots: list[list[WheelEntry]] = [[] for _ in range(MAX_SLOTS)]
         self._job_slots: dict[str, int] = {}  # job_id -> slot_index
+        self._job_entries: dict[str, WheelEntry] = {}
 
     def schedule(self, job_id: str, scheduled_at: datetime):
-        """Add a job to the wheel."""
+        """Add or update a job in the wheel."""
         now = datetime.now(UTC)
         if scheduled_at <= now:
             # Too late for the wheel, should be picked up by poll
@@ -47,14 +48,26 @@ class TimingWheel:
             # Beyond wheel range, will be picked up by MongoDB poll
             return
 
+        current_slot = self._job_slots.get(job_id)
+        entry = self._job_entries.get(job_id)
+        if entry is not None and current_slot is not None:
+            if current_slot != int(scheduled_at.timestamp()) % MAX_SLOTS:
+                self.slots[current_slot] = [e for e in self.slots[current_slot] if e.job_id != job_id]
+            entry.scheduled_at = scheduled_at
+            entry.job_id = job_id
+        else:
+            entry = WheelEntry(scheduled_at=scheduled_at, job_id=job_id)
+            self._job_entries[job_id] = entry
+
         slot = int(scheduled_at.timestamp()) % MAX_SLOTS
-        entry = WheelEntry(scheduled_at=scheduled_at, job_id=job_id)
-        self.slots[slot].append(entry)
+        if current_slot != slot or entry not in self.slots[slot]:
+            self.slots[slot].append(entry)
         self._job_slots[job_id] = slot
 
     def remove(self, job_id: str):
         """Remove a job from the wheel."""
         slot = self._job_slots.pop(job_id, None)
+        self._job_entries.pop(job_id, None)
         if slot is None:
             return
         before = len(self.slots[slot])
@@ -75,6 +88,7 @@ class TimingWheel:
         job_ids = due
         for jid in job_ids:
             self._job_slots.pop(jid, None)
+            self._job_entries.pop(jid, None)
         return job_ids
 
 
@@ -170,56 +184,72 @@ class IndexedPriorityQueue:
         self._index: dict[str, int] = {}
         self._entries: dict[str, list] = {}
         self._count: int = 0
+        self._dead_entries: int = 0
 
     def push(self, job: dict):
         jid = job["job_id"]
+        if jid in self._entries:
+            return
         key = self._sort_key(job)
-        entry = [key, jid, job]
-        is_new = jid not in self._entries
+        serial = 0
+        entry = [key, serial, jid, job]
         self._entries[jid] = entry
+        self._index[jid] = serial
         heapq.heappush(self._heap, entry)
-        if is_new:
-            self._count += 1
+        self._count += 1
 
     def pop(self) -> dict | None:
         while self._heap:
             entry = heapq.heappop(self._heap)
-            _, jid, job = entry
-            if self._entries.get(jid) is not entry:
+            _, serial, jid, job = entry
+            if self._entries.get(jid) is not entry or self._index.get(jid) != serial:
+                if self._dead_entries > 0:
+                    self._dead_entries -= 1
                 continue
             self._entries.pop(jid, None)
+            self._index.pop(jid, None)
             self._count -= 1
             return job
         return None
 
     def update_priority(self, job_id: str, new_effective_priority: float):
         entry = self._entries.get(job_id)
-        if entry is None or entry is _REMOVED:
+        if entry is None:
             return
-        _, _, job = entry
+        _, _, jid, job = entry
         job["effective_priority"] = new_effective_priority
         key = self._sort_key(job)
-        new_entry = [key, job_id, job]
+        serial = self._index.get(job_id, 0) + 1
+        new_entry = [key, serial, jid, job]
         self._entries[job_id] = new_entry
+        self._index[job_id] = serial
         heapq.heappush(self._heap, new_entry)
+        self._dead_entries += 1
+        if self._dead_entries > max(32, self._count):
+            self.heapify([entry[3] for entry in self._entries.values()])
 
     def remove(self, job_id: str):
         entry = self._entries.get(job_id)
-        if entry is None or entry is _REMOVED:
+        if entry is None:
             return
         self._entries.pop(job_id, None)
+        self._index.pop(job_id, None)
         self._count -= 1
+        self._dead_entries += 1
 
     def heapify(self, jobs: list[dict]):
         self._heap = []
         self._entries = {}
+        self._index = {}
         self._count = 0
+        self._dead_entries = 0
         for job in jobs:
             jid = job["job_id"]
             key = self._sort_key(job)
-            entry = [key, jid, job]
+            entry = [key, 0, jid, job]
             self._heap.append(entry)
             self._entries[jid] = entry
+            self._index[jid] = 0
             self._count += 1
         heapq.heapify(self._heap)
 

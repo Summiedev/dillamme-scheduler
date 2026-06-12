@@ -34,7 +34,7 @@ async def get_metrics():
             by_status[item["_id"]] = item["count"]
 
     total_jobs = sum(by_status.values())
-    dlq_size = await db.dlq.count_documents({})
+    dlq_size = await db.jobs.count_documents({"status": "failed", "dlq.active": True})
 
     return {
         "by_status": by_status,

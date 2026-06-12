@@ -49,16 +49,10 @@ INDEXES = {
                 "status": {"$in": ["completed", "cancelled"]}
             },
         },
-    ],
-    "dlq": [
+        # 7. Embedded DLQ lookup
         {
-            "keys": [("job_id", 1)],
-            "name": "idx_dlq_job_id",
-            "unique": True,
-        },
-        {
-            "keys": [("failed_at", -1)],
-            "name": "idx_dlq_failed_at",
+            "keys": [("status", 1), ("dlq.active", 1), ("dlq.failed_at", -1)],
+            "name": "idx_dlq_active",
         },
     ],
     "job_logs": [
