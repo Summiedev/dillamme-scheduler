@@ -205,27 +205,21 @@ Two algorithms run side by side in the worker. They are not alternatives — the
 - Tick (check current slot): O(k) where k = jobs due this second
 - Full rotation: O(n) over 3,600 ticks
 
-### Benchmark Results
+## Benchmark Results
 
-Workload: 10,000 jobs, mixed priorities, scheduled within a 60-second window. 100 measured iterations after 1 warm-up pass.
-
-| Benchmark | Workload | Mean (ms) | P50 (ms) | P95 (ms) | Stddev (ms) |
-|---|---|---|---|---|---|
-| PriorityQueue | insert 10,000 + drain | — | — | — | — |
-| TimingWheel + Heap | insert 10,000 + drain | — | — | — | — |
-| MongoDB indexed | 50,000 docs, top 100 | — | — | — | — |
-| MongoDB no index | 50,000 docs, top 100 | — | — | — | — |
+**Workload:** 10,000 jobs, mixed priorities, scheduled within a 60-second window.  
+**Methodology:** 100 measured iterations after 1 warm-up pass.
 
 > Run `python benchmark.py` from `backend/` to generate live numbers on your hardware. See [Running the Benchmark](#running-the-benchmark).
 
-**Published reference numbers** (from `docs/benchmark.md`, single-machine run):
+### Published Reference Numbers
 
-Benchmark          | Workload                      | Mean (ms) | P50 (ms) | P95 (ms) | Stddev (ms)
--------------------+-------------------------------+-----------+----------+----------+------------
-PriorityQueue      | insert 10,000, drain in order | 64.787    | 61.406   | 93.935   | 14.797
-TimingWheel + Heap | insert 10,000, drain in order | 58.859    | 52.317   | 96.654   | 20.088
-Mongo indexed      | 50,000 docs, top 100          | 2.033     | 1.807    | 3.464    | 0.899
-Mongo no index     | 50,000 docs, top 100          | 222.606   | 224.324  | 257.556  | 27.143
+| Benchmark | Workload | Mean (ms) | P50 (ms) | P95 (ms) | Std Dev (ms) |
+|------------|------------|------------:|-----------:|-----------:|--------------:|
+| PriorityQueue | Insert 10,000 jobs, drain in priority order | 64.787 | 61.406 | 93.935 | 14.797 |
+| TimingWheel + Heap | Insert 10,000 jobs, schedule across 60s, drain in order | 58.859 | 52.317 | 96.654 | 20.088 |
+| MongoDB (Indexed) | Query top 100 jobs from 50,000 documents | 2.033 | 1.807 | 3.464 | 0.899 |
+| MongoDB (No Index) | Query top 100 jobs from 50,000 documents | 222.606 | 224.324 | 257.556 | 27.143 |
 
 **Tradeoffs:**
 
